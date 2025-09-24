@@ -7,11 +7,13 @@ To ensure everyone on the team has the same development setup, we use an Anacond
 1. Install Anaconda (if not already installed)
 
   Download Anaconda for your operating system:
-  👉 [Anaconda Downloads](https://www.anaconda.com/download/success)
-  
+   [Anaconda Downloads](https://www.anaconda.com/download/success)
   Follow the installer instructions.
   
-  Verify the installation: `conda --version`
+  Verify the installation: 
+  ```bash
+conda --version
+```
 
 2. Create the Project Environment
 
