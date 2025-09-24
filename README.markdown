@@ -8,9 +8,6 @@ Welcome to the DaveBot Project! This project is designed to [insert brief projec
 - [Environment Setup](#environment-setup)
 - [Usage](#usage)
 - [Project Structure](#project-structure)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
 
 ## Installation
 To get started, ensure you have the following prerequisites installed:
@@ -19,8 +16,8 @@ To get started, ensure you have the following prerequisites installed:
 
 Clone the repository to your local machine:
 ```bash
-git clone https://github.com/[your-username]/[your-repo-name].git
-cd [your-repo-name]
+git clone https://github.com/shashankreddy28/Dave-bot.git
+cd Dave-bot
 ```
 
 ## Environment Setup
@@ -86,17 +83,18 @@ conda env create -f environment.yml
 ```
 
 ## Usage
-To run the project, ensure the environment is activated, then execute the main script or application:
+To run the project, ensure the environment is activated, then execute ..... (Placeholders for now):
 ```bash
 python main.py
 ```
-[Add specific instructions for running your project, e.g., "Run `python main.py --help` for command-line options" or "Open `notebooks/example.ipynb` in Jupyter for interactive exploration."]
+
 
 ## Project Structure
 A brief overview of the project's directory structure:
 ```
-daveBot-project/
-├── environment.yml       # Anaconda environment configuration
+Dave-bot/
+├── environment.yml      # Anaconda environment configuration
+├── .gitignore           # Information for git to ignore
 ├── main.py              # Main script to run the project
 ├── src/                 # Source code directory
 ├── notebooks/           # Jupyter notebooks for experimentation
@@ -104,20 +102,3 @@ daveBot-project/
 ├── data/                # Data files (not tracked in Git)
 └── README.md            # This file
 ```
-[Modify this structure based on your project's actual layout.]
-
-## Contributing
-We welcome contributions! To contribute:
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature`).
-3. Make your changes and commit them (`git commit -m 'Add your feature'`).
-4. Push to the branch (`git push origin feature/your-feature`).
-5. Open a pull request.
-
-Please follow our [Code of Conduct](CODE_OF_CONDUCT.md) and ensure your code adheres to our [style guidelines](STYLE_GUIDE.md) (if applicable).
-
-## License
-This project is licensed under the [MIT License](LICENSE). See the LICENSE file for details.
-
-## Contact
-For questions or support, reach out to [your-name] at [your-email@example.com] or open an issue on the [GitHub repository](https://github.com/[your-username]/[your-repo-name]/issues).
