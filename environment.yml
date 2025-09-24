@@ -1,0 +1,10 @@
+name: daveBot-project-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10   # or whichever version you want standardized
+  - pip
+  - pip:
+      - nd2reader
+      - tifffile
