@@ -2,22 +2,9 @@
 
 ## What You Need
 
-1. Python installed on your computer
-2. Two special packages for reading ND2 files and writing TIFF files
+1. Follow setup instruction from ReadMe
 
-## Setup (One Time Only)
-
-### Step 1: Install the packages
-
-Open your command prompt/terminal and type:
-
-```
-pip install nd2reader tifffile numpy
-```
-
-### Step 2: Download the script
-
-Save the `nd2_converter.py` file to your computer
+###  Run the script
 
 ## How to Use It
 
