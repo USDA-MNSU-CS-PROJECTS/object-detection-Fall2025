@@ -6,7 +6,8 @@ dependencies:
   - python=3.9   
   - pip
   - nd2
-  - notebook        
+  - notebook 
+  - postgresql       
   - ipykernel       # lets you use this env as a kernel in Jupyter
   - pip:
       - nd2reader
@@ -28,3 +29,4 @@ dependencies:
       - urllib3==2.5.0
       - pycparser==2.23
       - setuptools==58.0.4
+      - label-studio
