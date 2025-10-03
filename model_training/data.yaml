@@ -1,0 +1,8 @@
+path: /data
+train: images   # using all images for train since this is a small dataset
+val: images     # you can later split into separate folders if needed
+
+names:
+  0: Vascular Bundles
+
+task: segment
