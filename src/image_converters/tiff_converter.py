@@ -9,12 +9,10 @@ project_root = os.path.dirname(os.path.dirname(current_dir))  # .../src
 data_dir = os.path.join(project_root, "data")
 input_dir = os.path.join(data_dir, "nd2_images", "input_images")
 output_root = os.path.join(data_dir, "main_images", "output_images")
-#jpg_output_dir = os.path.join(output_root, "jpg_images")
 tiff_output_dir = os.path.join(output_root, "tiff_images")
 
 # Ensure output directories exist
 os.makedirs(output_root, exist_ok=True)
-#os.makedirs(jpg_output_dir, exist_ok=True)
 os.makedirs(tiff_output_dir, exist_ok=True)
 
 # Gather all .nd2 files in the input directory

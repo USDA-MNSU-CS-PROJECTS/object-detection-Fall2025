@@ -3,30 +3,32 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.9   
+  - python=3.9
   - pip
-  - nd2
-  - notebook 
-  - postgresql       
-  - ipykernel       # lets you use this env as a kernel in Jupyter
+  - notebook
+  - postgresql
+  - ipykernel # lets you use this env as a kernel in Jupyter
+  - pillow # for image converters
   - pip:
-      - nd2reader
-      - tifffile
-      - attrs==25.3.0
-      - boxsdk==3.14.0
-      - certifi==2025.8.3
-      - cffi==2.0.0
-      - charset-normalizer==3.4.3
-      - cryptography==46.0.1
-      - idna==3.10
-      - PyJWT==2.10.1
-      - python-dateutil==2.9.0.post0
-      - python-dotenv==1.1.1
-      - requests==2.32.5
-      - requests-toolbelt==1.0.0
-      - six==1.17.0
-      - typing-extensions==4.15.0
-      - urllib3==2.5.0
-      - pycparser==2.23
-      - setuptools==58.0.4
+      - nd2reader # for image converters
+      - tifffile # ^^
+      - attrs
+      - boxsdk
+      - certifi
+      - cffi
+      - charset-normalizer
+      - cryptography
+      - idna
+      - PyJWT
+      - python-dateutil
+      - python-dotenv
+      - requests
+      - requests-toolbelt
+      - six
+      - typing-extensions
+      - urllib3
+      - pycparser
+      - setuptools
       - label-studio
+      - nd2 # For image converters
+      - onnxruntime # ^^

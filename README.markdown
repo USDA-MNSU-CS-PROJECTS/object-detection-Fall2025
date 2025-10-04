@@ -109,6 +109,38 @@ To run the project, ensure the environment is activated, then execute ..... (Pla
 python main.py
 ```
 
+### Current Functionality
+
+#### 1. Directory Setup
+
+Sets up `data/` subfolder structure. Run the following in the root of the project:
+
+```bash
+python setup_directories.py
+```
+
+#### 2. Image Converters
+
+Place any ND2 files you want to process in `data/nd2_images/input_images`. Next, move into the `image_converters/` folder:
+
+```bash
+cd src/image_converters
+```
+
+You have to run the TIFF converter first for now:
+
+```bash
+python tiff_converter.py
+```
+
+Then you can run the PNG converter:
+
+```bash
+python png_converter.py
+```
+
+All your processesed images can be found in `data/main_images/output_images/png_images/`.
+
 ## Project Structure
 
 A brief overview of the project's directory structure:
@@ -132,7 +164,7 @@ Dave-bot/
 ├── data/
 │   ├── main_images/
 │   │   └── output_images/
-│   │       ├── preprocessed_images/
+│   │       ├── png_images/
 │   │       └── tiff_images/
 │   └── nd2_images/
 │       └── input_images/
@@ -150,4 +182,4 @@ python setup_directories.py
 
 #### Option 2: Manually Create Folders
 
-If you prefer to create the folders manually, please make sure you follow the structure shown above. The image conversion and preprocessing scripts depend on this organization to find input images and correctly place output files.
+If you prefer to create the folders manually, please make sure you follow the structure shown above. The image conversion scripts depend on this organization to find input images and correctly place output files.

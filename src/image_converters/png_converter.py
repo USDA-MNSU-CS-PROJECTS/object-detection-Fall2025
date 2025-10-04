@@ -1,4 +1,3 @@
-from rembg import remove
 from PIL import Image
 import os
 
@@ -9,16 +8,14 @@ def main() -> None:
     data_dir = os.path.join(project_root, "data")
     output_root = os.path.join(data_dir, "main_images", "output_images")
     tiff_dir = os.path.join(output_root, "tiff_images")
-    #jpg_dir = os.path.join(output_root, "jpg_images")
-    preprocessed_dir = os.path.join(output_root, "preprocessed_images")
+    png_dir = os.path.join(output_root, "png_images")
 
     # Ensure output directories exist
     os.makedirs(output_root, exist_ok=True)
     os.makedirs(tiff_dir, exist_ok=True)
-    #os.makedirs(jpg_dir, exist_ok=True)
-    os.makedirs(preprocessed_dir, exist_ok=True)
+    os.makedirs(png_dir, exist_ok=True)
 
-    # Collect all TIFFs to preprocess
+    # Collect all TIFFs to PNGs
     tiff_candidates = [f for f in os.listdir(tiff_dir) if f.lower().endswith((".tiff", ".tif"))]
     if not tiff_candidates:
         raise FileNotFoundError(
@@ -28,7 +25,7 @@ def main() -> None:
     for filename in tiff_candidates:
         input_path = os.path.join(tiff_dir, filename)
         base_name, _ = os.path.splitext(filename)
-        output_path = os.path.join(preprocessed_dir, f"{base_name}_removed.png")
+        output_path = os.path.join(png_dir, f"{base_name}.png")
 
         # Open input image
         try:
@@ -37,14 +34,13 @@ def main() -> None:
             print(f"Error: Input image '{input_path}' not found.")
             raise
 
-        # Remove background
-        print(f"Removing background for: {filename} ...")
-        output_image = remove(input_image)
+        # Convert to PNG
+        print(f"Converting to PNG: {filename} ...")
 
         # Save result
-        output_image.save(output_path)
+        input_image.save(output_path, "PNG")
 
-        print(f"Background removed successfully. Output saved to: {output_path}")
+        print(f"Conversion successful. Output saved to: {output_path}")
 
 if __name__ == "__main__":
     main()

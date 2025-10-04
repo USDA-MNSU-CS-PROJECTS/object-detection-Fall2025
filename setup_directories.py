@@ -11,7 +11,7 @@ def create_directory_structure():
     directories = [
         "data/nd2_images/input_images",
         "data/main_images/output_images/tiff_images",
-        "data/main_images/output_images/preprocessed_images",
+        "data/main_images/output_images/png_images",
     ]
 
     project_root = os.path.dirname(os.path.abspath(__file__))
