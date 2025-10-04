@@ -8,27 +8,26 @@ dependencies:
   - notebook
   - postgresql
   - ipykernel # lets you use this env as a kernel in Jupyter
-  - pillow # for image converters
+  - pillow
   - pip:
-      - nd2reader # for image converters
-      - tifffile # ^^
-      - attrs
-      - boxsdk
-      - certifi
-      - cffi
-      - charset-normalizer
-      - cryptography
-      - idna
-      - PyJWT
-      - python-dateutil
-      - python-dotenv
-      - requests
-      - requests-toolbelt
-      - six
-      - typing-extensions
-      - urllib3
-      - pycparser
-      - setuptools
+      - nd2reader
+      - tifffile
+      - attrs>=17.3.0
+      - boxsdk==3.14.0
+      - certifi>=2024.6.2
+      - cffi>=1.16.0
+      - charset-normalizer>=3.3.2
+      - cryptography>=42.0.0
+      - idna>=3.7
+      - PyJWT>=2.8.0
+      - python-dateutil>=2.8.1
+      - python-dotenv>=1.0.1
+      - requests>=2.31.0
+      - requests-toolbelt>=1.0.0
+      - six>=1.16.0
+      - typing-extensions>=4.12.0
+      - urllib3>=2.2.0
+      - pycparser>=2.21
+      - setuptools>=58.0.4
       - label-studio
-      - nd2 # For image converters
-      - onnxruntime # ^^
+      - nd2
