@@ -2,7 +2,7 @@
 
 ## Overview
 
-Welcome to the DaveBot Project! This project is designed to [insert brief project description or purpose here, e.g., "create an intelligent chatbot for automating customer support"]. This README provides instructions for setting up, running, and contributing to the project.
+Welcome to the DaveBot Project! This project is designed to create an intelligent chatbot for automating customer support. The chatbot will utilize natural language processing to understand user queries and provide relevant responses. This README provides instructions for setting up, running, and contributing to the project.
 
 ## Table of Contents
 
@@ -89,7 +89,7 @@ If new dependencies are added to the project, update the `environment.yml` file.
 Update your local environment:
 
 ```bash
-conda env update -f environment.yml --prune
+conda env update -f environment.yml
 ```
 
 ### 5. Recreating the Environment (Optional)
@@ -148,6 +148,12 @@ A brief overview of the project's directory structure:
 ```
 Dave-bot/
 ├── data/                # Data files (not tracked in Git)
+│   ├── main_images/
+│   │   └── output_images/
+│   │       ├── png_images/
+│   │       └── tiff_images/
+│   └── nd2_images/
+│       └── input_images/
 ├── src/                 # Source code directory
 ├── environment.yml      # Anaconda environment configuration
 ├── .gitignore           # Information for git to ignore
