@@ -12,7 +12,7 @@ dependencies:
   - ultralytics
   - shapely
   - scikit-image
-  - gradio
+  - gradio=3.50.2 # only version that works with python 3.9
   - pip:
       - nd2reader
       - numpy>=1.23,<2.0 # avoid numpy 2.0 for now due to compatibility issues
