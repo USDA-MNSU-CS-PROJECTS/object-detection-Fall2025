@@ -86,7 +86,7 @@ class ImageConverter:
 
         nd2_files = [
             f for f in os.listdir(input_dir)
-            if f.lower().endswith(".nd2")
+            if f.lower().endswith(".nd2") and not f.startswith('._')
         ]
 
         if len(nd2_files) == 0:

@@ -14,6 +14,9 @@ from converter import ImageConverter
 from predictor import ModelPredictor
 from post_processor import PostProcessor
 
+# Configuration for the default model
+DEFAULT_MODEL_FILENAME = "best_multi_class_client_hpc.pt"
+
 
 def run_conversion(files):
     """Conversion-only pipeline"""
@@ -27,8 +30,22 @@ def run_conversion(files):
     os.makedirs(converted_dir, exist_ok=True)
     
     try:
+        # Process uploaded files, extracting zip files
         for file in files:
-            shutil.copy(file.name, os.path.join(input_dir, os.path.basename(file.name)))
+            file_path = file.name
+            if file_path.lower().endswith('.zip'):
+                with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                    for member in zip_ref.infolist():
+                        sanitized_name = os.path.basename(member.filename)
+                        # Skip directories and hidden/resource files (like those from macOS)
+                        if member.is_dir() or sanitized_name.startswith('._') or sanitized_name.startswith('.'):
+                            continue
+
+                        if sanitized_name.lower().endswith(('.nd2', '.png')):
+                            with zip_ref.open(member) as source, open(os.path.join(input_dir, sanitized_name), 'wb') as target:
+                                shutil.copyfileobj(source, target)
+            elif file_path.lower().endswith(('.nd2', '.png')):
+                shutil.copy(file_path, os.path.join(input_dir, os.path.basename(file_path)))
             
         converter = ImageConverter()
         # Use converted_dir as the output directory for the converter
@@ -60,22 +77,34 @@ def run_conversion(files):
 
 def run_full_pipeline(files, conf_threshold, save_overlays):
     """Main processing pipeline for analysis"""
+    temp_dir = None
     if not files:
-        return None, None, "No files uploaded", None
-    
-    # Setup temp directories
-    temp_dir = tempfile.mkdtemp()
-    input_dir = os.path.join(temp_dir, "input")
-    converted_dir = os.path.join(temp_dir, "converted")
-    output_dir = os.path.join(temp_dir, "output")
-    os.makedirs(input_dir, exist_ok=True)
-    os.makedirs(converted_dir, exist_ok=True)
-    os.makedirs(output_dir, exist_ok=True)
+        return None, None, "No files uploaded", None, None
     
     try:
-        # Save uploaded files
+        # Setup temp directories
+        temp_dir = tempfile.mkdtemp()
+        input_dir = os.path.join(temp_dir, "input")
+        converted_dir = os.path.join(temp_dir, "converted")
+        output_dir = os.path.join(temp_dir, "output")
+        os.makedirs(input_dir, exist_ok=True)
+        os.makedirs(converted_dir, exist_ok=True)
+        # Process uploaded files, extracting zip files
         for file in files:
-            shutil.copy(file.name, os.path.join(input_dir, os.path.basename(file.name)))
+            file_path = file.name
+            if file_path.lower().endswith('.zip'):
+                with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                    for member in zip_ref.infolist():
+                        sanitized_name = os.path.basename(member.filename)
+                        # Skip directories and hidden/resource files (like those from macOS)
+                        if member.is_dir() or sanitized_name.startswith('._') or sanitized_name.startswith('.'):
+                            continue
+
+                        if sanitized_name.lower().endswith(('.nd2', '.png')):
+                            with zip_ref.open(member) as source, open(os.path.join(input_dir, sanitized_name), 'wb') as target:
+                                shutil.copyfileobj(source, target)
+            elif file_path.lower().endswith(('.nd2', '.png')):
+                shutil.copy(file_path, os.path.join(input_dir, os.path.basename(file_path)))
         
         # Convert ND2 files
         converter = ImageConverter()
@@ -88,12 +117,12 @@ def run_full_pipeline(files, conf_threshold, save_overlays):
         all_pngs_for_processing = converted_pngs + direct_pngs
 
         if not all_pngs_for_processing:
-            return None, None, "No images to process", None
+            return None, None, "No images to process", None, temp_dir
         
         # Run predictions
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(os.path.dirname(script_dir))
-        model_path = os.path.join(project_root, "sample_trained_models", "best_multi_class_client_hpc.pt")
+        model_path = os.path.join(project_root, "sample_trained_models", DEFAULT_MODEL_FILENAME)
         predictor = ModelPredictor(model_path)
         predictions = predictor.batch_predict(all_pngs_for_processing, output_dir, conf_threshold, save=save_overlays)
         
@@ -128,22 +157,22 @@ def run_full_pipeline(files, conf_threshold, save_overlays):
         if not df.empty:
             status += f"Found {len(df)} detections.\n"
         
-        return csv_path, output_zip_path, status, df.head(50) if not df.empty else pd.DataFrame()
+        return csv_path, output_zip_path, status, df.head(50) if not df.empty else pd.DataFrame(), temp_dir
         
     except Exception as e:
         import traceback
-        return None, None, f"Error: {str(e)}\n{traceback.format_exc()}", None
+        return None, None, f"Error: {str(e)}\n{traceback.format_exc()}", None, temp_dir
 
 
 # Build UI with Tabs
 with gr.Blocks(title="Alfalfa Stem Tool") as app:
-    gr.Markdown("# Alfalfa Stem Processing Tool")
+    gr.Markdown("# Alfalfa Stem Object Detection Tool")
 
     with gr.Tabs():
-        with gr.TabItem("Full Analysis Pipeline"):
+        with gr.TabItem("Full Detection Pipeline"):
             with gr.Row():
                 with gr.Column(scale=2):
-                    analysis_files = gr.File(label="Upload ND2 or PNG files", file_count="multiple")
+                    analysis_files = gr.File(label="Upload ND2, PNG, or ZIP files", file_count="multiple", file_types=[".nd2", ".png", ".zip"])
                     analysis_conf = gr.Slider(0.60, 0.95, value=0.80, label="Confidence Threshold")
                     analysis_save_overlay = gr.Checkbox(label="Save model prediction images (overlays)", value=False)
                     analysis_btn = gr.Button("Run Analysis", variant="primary")
@@ -162,7 +191,7 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
         with gr.TabItem("Simple Image Converter"):
             with gr.Row():
                 with gr.Column(scale=2):
-                    convert_files = gr.File(label="Upload ND2 or PNG files", file_count="multiple")
+                    convert_files = gr.File(label="Upload ND2, PNG, or ZIP files", file_count="multiple", file_types=[".nd2", ".png", ".zip"])
                     convert_btn = gr.Button("Convert", variant="primary")
                 with gr.Column(scale=3):
                     convert_status = gr.Textbox(label="Status", lines=3)
