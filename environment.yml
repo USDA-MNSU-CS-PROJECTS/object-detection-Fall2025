@@ -13,6 +13,8 @@ dependencies:
   - shapely
   - scikit-image
   - gradio=3.50.2 # only version that works with python 3.9
+  - pytorch::pytorch
+  - pytorch::torchvision
   - pip:
       - nd2reader
       - numpy>=1.23,<2.0 # avoid numpy 2.0 for now due to compatibility issues
