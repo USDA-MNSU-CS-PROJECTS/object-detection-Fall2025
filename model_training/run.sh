@@ -1,3 +1,5 @@
+#NOTE: This is an old file used to run off of the USDA HPC
+
 #!/bin/bash
 #SBATCH --job-name=yolo8seg_test
 #SBATCH --account=heuschele_project
