@@ -9,7 +9,7 @@ import zipfile
 # Add api folder to path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'api'))
 
-# Import what's ready
+# Import APIs
 from converter import ImageConverter
 from predictor import ModelPredictor
 from post_processor import PostProcessor
