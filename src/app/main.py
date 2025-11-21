@@ -16,7 +16,16 @@ from post_processor import PostProcessor
 
 # Configuration for the default model
 DEFAULT_MODEL_FILENAME = "best_multi_class_client_hpc.pt"
+DEFAULT_CONF_THRESHOLD = 0.80
 
+
+def clear_all_analysis():
+    """Clear all analysis inputs and outputs"""
+    return None, False, "", None, None, pd.DataFrame(), []
+
+def clear_all_conversion():
+    """Clear all conversion inputs and outputs"""
+    return None, "", None, []
 
 def run_conversion(files):
     """Conversion-only pipeline"""
@@ -75,7 +84,7 @@ def run_conversion(files):
         return None, f"Error: {str(e)}"
 
 
-def run_full_pipeline(files, conf_threshold, save_overlays):
+def run_full_pipeline(files, save_overlays):
     """Main processing pipeline for analysis"""
     temp_dir = None
     if not files:
@@ -124,7 +133,7 @@ def run_full_pipeline(files, conf_threshold, save_overlays):
         project_root = os.path.dirname(os.path.dirname(script_dir))
         model_path = os.path.join(project_root, "sample_trained_models", DEFAULT_MODEL_FILENAME)
         predictor = ModelPredictor(model_path)
-        predictions = predictor.batch_predict(all_pngs_for_processing, output_dir, conf_threshold, save=save_overlays)
+        predictions = predictor.batch_predict(all_pngs_for_processing, output_dir, DEFAULT_CONF_THRESHOLD, save=save_overlays)
         
         # Post-process
         processor = PostProcessor(output_dir)
@@ -173,7 +182,6 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
             with gr.Row():
                 with gr.Column(scale=2):
                     analysis_files = gr.File(label="Upload ND2, PNG, or ZIP files", file_count="multiple", file_types=[".nd2", ".png", ".zip"])
-                    analysis_conf = gr.Slider(0.60, 0.95, value=0.80, label="Confidence Threshold")
                     analysis_save_overlay = gr.Checkbox(label="Save model prediction images (overlays)", value=False)
                     analysis_btn = gr.Button("Run Analysis", variant="primary")
                 
@@ -188,6 +196,9 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
             gr.Markdown("### Results Preview")
             analysis_preview = gr.Dataframe(label="Detection Results")
 
+            # Clear everything button at the bottom
+            analysis_clear_all_btn = gr.Button("Clear All & Start New Analysis", variant="stop", size="lg")
+
         with gr.TabItem("Simple Image Converter"):
             with gr.Row():
                 with gr.Column(scale=2):
@@ -199,19 +210,37 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
             gr.Markdown("### Download Converted Images")
             convert_zip = gr.File(label="Converted Images (ZIP)")
 
-    # Hook up buttons to functions
+            # Clear everything button at the bottom
+            convert_clear_all_btn = gr.Button("Clear All & Start New Conversion", variant="stop", size="lg")
+
+    # Hook up Analysis tab functions
     analysis_btn.click(
         fn=run_full_pipeline,
-        inputs=[analysis_files, analysis_conf, analysis_save_overlay],
+        inputs=[analysis_files, analysis_save_overlay],
         outputs=[analysis_csv, analysis_zip, analysis_status, analysis_preview],
         api_name="run_analysis"
     )
     
+    # Clear everything in analysis tab
+    analysis_clear_all_btn.click(
+        fn=clear_all_analysis,
+        inputs=[],
+        outputs=[analysis_files, analysis_save_overlay, analysis_status, analysis_csv, analysis_zip, analysis_preview]
+    )
+
+    # Hook up Conversion tab functions
     convert_btn.click(
         fn=run_conversion,
         inputs=[convert_files],
         outputs=[convert_zip, convert_status],
         api_name="run_conversion"
+    )
+
+    # Clear everything in conversion tab
+    convert_clear_all_btn.click(
+        fn=clear_all_conversion,
+        inputs=[],
+        outputs=[convert_files, convert_status, convert_zip]
     )
 
 if __name__ == "__main__":

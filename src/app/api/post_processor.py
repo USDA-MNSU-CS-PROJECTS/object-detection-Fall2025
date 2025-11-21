@@ -3,6 +3,8 @@ import os
 import cv2
 import numpy as np
 from shapely.geometry import Polygon
+from shapely.validation import make_valid
+from shapely.ops import unary_union
 import matplotlib.pyplot as plt
 
 class PostProcessor:
@@ -51,28 +53,34 @@ class PostProcessor:
                     "vb_count": "N/A",
                     "vb_area_microns": "N/A",
                     "cs_area_microns": "N/A",
+                    "vb_to_cs_ratio": "N/A",
                     "notes": "No Cross Section detected"
                 })
                 continue
 
             vb_polys = self._filter_vascular_bundles(main_box, preds)
             
+            # Create complete cross section polygon that includes vascular bundles
+            complete_cs_poly = self._create_complete_cross_section(main_poly, vb_polys)
+
             # Save visualization
             output_path = os.path.join(self.viz_output_dir, img_name)
-            self._draw_research_style(img, main_poly, vb_polys, output_path)
+            self._draw_research_style(img, complete_cs_poly, vb_polys, output_path)
             self.visualization_paths.append(output_path)
 
             # Record summary
             vb_pixel_area = sum([self._polygon_area(vb) for vb in vb_polys])
-            cs_pixel_area = main_box["area"]
+            cs_pixel_area = complete_cs_poly.area #now uses the combined polygon area
             
             areas = self._calculate_areas(vb_pixel_area, cs_pixel_area)
+            ratio = self._calculate_ratio(areas["vb_area_microns"], areas["cs_area_microns"])
 
             records.append({
                 "image_name": img_name,
                 "vb_count": len(vb_polys),
-                "vb_area_microns": areas["vb_area_microns"],
-                "cs_area_microns": areas["cs_area_microns"],
+                "vb_area_microns": round(areas["vb_area_microns"], 4),
+                "cs_area_microns": round(areas["cs_area_microns"], 4),
+                "vb_to_cs_ratio": round(ratio["vb_to_cs_ratio"], 4),
                 "notes": ""
             })
 
@@ -90,6 +98,57 @@ class PostProcessor:
             "vb_area_microns": vb_pixel_area * (self.PIXEL_TO_MICRON**2),
             "cs_area_microns": cs_pixel_area * (self.PIXEL_TO_MICRON**2)
         }
+
+    def _calculate_ratio(self, vb_area, cs_area):
+        ratio = vb_area / cs_area if cs_area > 0 else 0
+        return {
+            "vb_to_cs_ratio": ratio
+        }
+
+    def _create_complete_cross_section(self, main_poly, vb_polys):
+        """
+        Creates a complete cross section by combining the main polygon with vascular bundles.
+        Uses robust geometry handling to avoid topology errors.
+        """
+        try:
+            # Ensure main polygon is valid
+            if not main_poly.is_valid:
+                main_poly = make_valid(main_poly)
+            
+            # Collect all valid polygons
+            all_polygons = [main_poly]
+            
+            for vb_points in vb_polys:
+                try:
+                    vb_poly = Polygon(vb_points)
+                    if not vb_poly.is_valid:
+                        vb_poly = make_valid(vb_poly)
+                    
+                    # Only add if it's a valid polygon after validation
+                    if vb_poly.is_valid and not vb_poly.is_empty:
+                        all_polygons.append(vb_poly)
+                except Exception as e:
+                    print(f"Warning: Skipping invalid vascular bundle polygon: {e}")
+                    continue
+            
+            # Use unary_union for better handling of multiple polygons
+            # This is more robust than iterative union operations
+            if len(all_polygons) == 1:
+                combined = all_polygons[0]
+            else:
+                combined = unary_union(all_polygons)
+            
+            # Ensure the result is valid
+            if not combined.is_valid:
+                combined = make_valid(combined)
+            
+            # Return the convex hull for a smooth outer boundary
+            return combined.convex_hull
+            
+        except Exception as e:
+            print(f"Warning: Error creating complete cross section, using main polygon only: {e}")
+            # Fallback to just the main polygon if union fails
+            return main_poly.convex_hull
 
     def _collect_polygons(self, result):
         preds = []
