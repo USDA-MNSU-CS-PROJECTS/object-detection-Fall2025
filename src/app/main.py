@@ -15,23 +15,24 @@ from predictor import ModelPredictor
 from post_processor import PostProcessor
 
 # Configuration for the default model
-DEFAULT_MODEL_FILENAME = "best_multi_class_client_hpc.pt"
+DEFAULT_MODEL_FILENAME = "C:/Users/Abi/Documents/GitHub/Dave-bot/sample_trained_models/best.pt"
 DEFAULT_CONF_THRESHOLD = 0.80
 
 
 def clear_all_analysis():
     """Clear all analysis inputs and outputs"""
-    return None, False, "", None, None, pd.DataFrame(), []
+    return None, "", None, None, pd.DataFrame()
 
 def clear_all_conversion():
     """Clear all conversion inputs and outputs"""
-    return None, "", None, []
+    return None, "", None
 
 def run_conversion(files):
     """Conversion-only pipeline"""
     if not files:
         return None, "No files uploaded."
     
+    progress(0, desc="Setting up...")
     temp_dir = tempfile.mkdtemp()
     input_dir = os.path.join(temp_dir, "input")
     converted_dir = os.path.join(temp_dir, "converted")
@@ -40,6 +41,7 @@ def run_conversion(files):
     
     try:
         # Process uploaded files, extracting zip files
+        progress(0.1, desc="Processing uploaded files...")
         for file in files:
             file_path = file.name
             if file_path.lower().endswith('.zip'):
@@ -56,6 +58,7 @@ def run_conversion(files):
             elif file_path.lower().endswith(('.nd2', '.png')):
                 shutil.copy(file_path, os.path.join(input_dir, os.path.basename(file_path)))
             
+        progress(0.3, desc="Converting images...")
         converter = ImageConverter()
         # Use converted_dir as the output directory for the converter
         png_files = converter.process_directory(input_dir, converted_dir)
@@ -65,6 +68,8 @@ def run_conversion(files):
         for f in os.listdir(input_dir):
             if f.lower().endswith('.png'):
                 shutil.copy(os.path.join(input_dir, f), converted_dir)
+
+        progress(0.8, desc="Creating output archive...")
 
         # Zip the contents of the converted_dir
         output_zip_path = os.path.join(temp_dir, "converted_images.zip")
@@ -77,6 +82,7 @@ def run_conversion(files):
         if num_images == 0:
             return None, "No images were converted or uploaded."
 
+        progress(1.0, desc="Complete!")
         status = f"Successfully converted/processed {num_images} images."
         return output_zip_path, status
         
@@ -84,7 +90,7 @@ def run_conversion(files):
         return None, f"Error: {str(e)}"
 
 
-def run_full_pipeline(files, save_overlays):
+def run_full_pipeline(files, progress=gr.Progress()):
     """Main processing pipeline for analysis"""
     temp_dir = None
     if not files:
@@ -92,13 +98,16 @@ def run_full_pipeline(files, save_overlays):
     
     try:
         # Setup temp directories
+        progress(0, desc="Setting up directories...")
         temp_dir = tempfile.mkdtemp()
         input_dir = os.path.join(temp_dir, "input")
         converted_dir = os.path.join(temp_dir, "converted")
         output_dir = os.path.join(temp_dir, "output")
         os.makedirs(input_dir, exist_ok=True)
         os.makedirs(converted_dir, exist_ok=True)
+
         # Process uploaded files, extracting zip files
+        progress(0.1, desc="Processing uploaded files...")
         for file in files:
             file_path = file.name
             if file_path.lower().endswith('.zip'):
@@ -116,6 +125,7 @@ def run_full_pipeline(files, save_overlays):
                 shutil.copy(file_path, os.path.join(input_dir, os.path.basename(file_path)))
         
         # Convert ND2 files
+        progress(0.2, desc="Converting ND2 files to PNG...")
         converter = ImageConverter()
         converted_pngs = converter.process_directory(input_dir, converted_dir)
         
@@ -129,13 +139,15 @@ def run_full_pipeline(files, save_overlays):
             return None, None, "No images to process", None, temp_dir
         
         # Run predictions
+        progress(0.4, desc=f"Running detection on {len(all_pngs_for_processing)} images...")
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(os.path.dirname(script_dir))
         model_path = os.path.join(project_root, "sample_trained_models", DEFAULT_MODEL_FILENAME)
         predictor = ModelPredictor(model_path)
-        predictions = predictor.batch_predict(all_pngs_for_processing, output_dir, DEFAULT_CONF_THRESHOLD, save=save_overlays)
+        predictions = predictor.batch_predict(all_pngs_for_processing, output_dir, DEFAULT_CONF_THRESHOLD, save=False)
         
         # Post-process
+        progress(0.7, desc="Processing results and creating visualizations...")
         processor = PostProcessor(output_dir)
         df = processor.process_predictions(predictions)
         viz_files = processor.visualization_paths
@@ -147,6 +159,7 @@ def run_full_pipeline(files, save_overlays):
             df.to_csv(csv_path, index=False)
         
         # Create a zip file with all the output images
+        progress(0.9, desc="Creating output archive...")
         output_zip_path = os.path.join(output_dir, "output_images.zip")
         with zipfile.ZipFile(output_zip_path, 'w') as zipf:
             # Add converted images
@@ -155,17 +168,12 @@ def run_full_pipeline(files, save_overlays):
             # Add post-processor visualizations
             for viz_file in viz_files:
                 zipf.write(viz_file, os.path.join('visualizations', os.path.basename(viz_file)))
-            # Add predictor overlays if they were saved
-            if save_overlays:
-                prediction_img_dir = os.path.join(output_dir, "predicted_images")
-                if os.path.isdir(prediction_img_dir):
-                    for img_file in os.listdir(prediction_img_dir):
-                        zipf.write(os.path.join(prediction_img_dir, img_file), os.path.join('prediction_overlays', img_file))
 
         status = f"Processed {len(all_pngs_for_processing)} images.\n"
         if not df.empty:
             status += f"Found {len(df)} detections.\n"
         
+        progress(1.0, desc="Complete!")
         return csv_path, output_zip_path, status, df.head(50) if not df.empty else pd.DataFrame(), temp_dir
         
     except Exception as e:
@@ -182,7 +190,6 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
             with gr.Row():
                 with gr.Column(scale=2):
                     analysis_files = gr.File(label="Upload ND2, PNG, or ZIP files", file_count="multiple", file_types=[".nd2", ".png", ".zip"])
-                    analysis_save_overlay = gr.Checkbox(label="Save model prediction images (overlays)", value=False)
                     analysis_btn = gr.Button("Run Analysis", variant="primary")
                 
                 with gr.Column(scale=3):
@@ -216,7 +223,7 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
     # Hook up Analysis tab functions
     analysis_btn.click(
         fn=run_full_pipeline,
-        inputs=[analysis_files, analysis_save_overlay],
+        inputs=[analysis_files],
         outputs=[analysis_csv, analysis_zip, analysis_status, analysis_preview],
         api_name="run_analysis"
     )
@@ -225,7 +232,7 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
     analysis_clear_all_btn.click(
         fn=clear_all_analysis,
         inputs=[],
-        outputs=[analysis_files, analysis_save_overlay, analysis_status, analysis_csv, analysis_zip, analysis_preview]
+        outputs=[analysis_files, analysis_status, analysis_csv, analysis_zip, analysis_preview]
     )
 
     # Hook up Conversion tab functions
@@ -244,4 +251,5 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
     )
 
 if __name__ == "__main__":
+    app.queue() # For progress tracking
     app.launch(inbrowser=True)

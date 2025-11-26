@@ -52,6 +52,7 @@ class PostProcessor:
                     "image_name": img_name,
                     "vb_count": "N/A",
                     "vb_area_microns": "N/A",
+                    "avg_vb_area_microns": "N/A",
                     "cs_area_microns": "N/A",
                     "vb_to_cs_ratio": "N/A",
                     "notes": "No Cross Section detected"
@@ -75,10 +76,15 @@ class PostProcessor:
             areas = self._calculate_areas(vb_pixel_area, cs_pixel_area)
             ratio = self._calculate_ratio(areas["vb_area_microns"], areas["cs_area_microns"])
 
+            # Calculate average vascular bundle area
+            vb_count = len(vb_polys)
+            avg_vb_area = areas["vb_area_microns"] / vb_count if vb_count > 0 else 0
+
             records.append({
                 "image_name": img_name,
                 "vb_count": len(vb_polys),
                 "vb_area_microns": round(areas["vb_area_microns"], 4),
+                "avg_vb_area_microns": round(avg_vb_area, 4),
                 "cs_area_microns": round(areas["cs_area_microns"], 4),
                 "vb_to_cs_ratio": round(ratio["vb_to_cs_ratio"], 4),
                 "notes": ""
@@ -131,7 +137,7 @@ class PostProcessor:
                     print(f"Warning: Skipping invalid vascular bundle polygon: {e}")
                     continue
             
-            # Use unary_union for better handling of multiple polygons
+            # Uses unary_union for better handling of multiple polygons
             # This is more robust than iterative union operations
             if len(all_polygons) == 1:
                 combined = all_polygons[0]
