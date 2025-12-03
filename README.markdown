@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project provides a complete pipeline for analyzing microscopy images of alfalfa stems. It features a web-based user interface built with Gradio for easy interaction, allowing users to upload images, run an object detection model to identify key structures (cross-sections and vascular bundles), and receive detailed, research-ready outputs.
+This project provides a complete pipeline for analyzing microscopic images of alfalfa stems. It features a web-based user interface built with Gradio for easy interaction, allowing users to upload images, run an object detection model to identify key structures (cross-sections and vascular bundles), and receive detailed, research-ready outputs.
 
 The core of this project is a YOLOv8 segmentation model trained to detect and segment vascular bundles in alfalfa stem . The repository includes scripts for data downloading, model training, and the main Gradio application.
 
@@ -33,7 +33,9 @@ The core of this project is a YOLOv8 segmentation model trained to detect and se
 │   │       ├── predictor.py
 │   │       └── post_processor.py
 │   ├── data_downloader/   # Scripts for downloading data from Box
-│   └── ...
+│   └── image_converters/  # Scripts for converting .nd2 files to .png files
+│   └── model_inference/   # Scripts for running the trained YOLOv8 model
+│   └── post_processer/    # Scripts for post-processing the results from model inference
 ├── .gitignore
 ├── environment.yml        # Conda environment definition
 └── README.markdown
@@ -72,7 +74,14 @@ This project uses a Conda environment to ensure a consistent development setup.
     ```
     *Note: The environment name is defined inside the `environment.yml` file.*
 
-3.  **Verify the Setup:**
+3.  **Create Data Directories:**
+    Run the setup script to create the necessary directory structure for data storage and testing:
+    ```bash
+    python setup_directories.py
+    ```
+    This script creates directories for input images, output images, and test data used during development and testing. The directories are hardcoded in the test scripts.
+
+4.  **Verify the Setup:**
     If Anaconda was just installed, you can verify the installation by running `conda --version`.
 
 ### 4. Running the Gradio Application
@@ -90,14 +99,14 @@ The main application is the Gradio web interface.
     ```
 4.  Open your web browser and go to the local URL provided by Gradio (usually `http://127.0.0.1:7860`).
 
-### 3. Data Downloader
+### 5. Data Downloader
 
-The `src/data_downloader` contains scripts to automate downloading and preparing data from Box.
+The `src/data_downloader` contains scripts to automate downloading and preparing data from Box. This was a one time use code that uses box developer console and API keys to download the data from Box. [Get more information](src/data_downloader/downloader_documentation.md)
 
 -   **Configuration:** Add your Box API credentials to a `.env` file in the `src/data_downloader` directory.
--   **Usage:** Run `run_downloader.py` to start the process. See `downloader_documentation.md` for more details.
+-   **Usage:** Run `run_downloader.py` to start the process.
 
-### 4. Model Training
+### 6. Model Training
 
 The `model_training` directory contains the necessary files to train the YOLOv8 segmentation model.
 

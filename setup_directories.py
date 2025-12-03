@@ -12,6 +12,8 @@ def create_directory_structure():
         "data/nd2_images/input_images",
         "data/main_images/output_images/tiff_images",
         "data/main_images/output_images/png_images",
+        "converter_test_data/multi_nd2_files",
+        "converter_test_data/output_pngs"
     ]
 
     project_root = os.path.dirname(os.path.abspath(__file__))

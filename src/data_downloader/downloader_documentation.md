@@ -2,6 +2,13 @@
 
 This downloader automates the process of acquiring and preparing image data from Box for machine learning tasks.
 
+> [!NOTE]
+> **One-Time Use & Limitations**: This code was originally written as a one-time utility to download raw data for the initial dataset. It is specifically hardcoded to:
+> *   Target the '10xstitch' folder.
+> *   Download only images corresponding to timepoints **t0** or **t4**.
+>
+> **For future use cases**, you will likely need to modify `downloader.py` to adjust these filters and target folders.
+
 ## How it Works
 
 1.  **Authentication**: Uses Box API credentials (Client ID, Client Secret, and Refresh Token) stored in a `.env` file to authenticate and access the specified Box folder.
