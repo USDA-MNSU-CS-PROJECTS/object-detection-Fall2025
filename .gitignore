@@ -1,5 +1,6 @@
 data/
 */.env
+src/data_downloader/.env
 __pycache__/
 *.pyc
 *.pyo
