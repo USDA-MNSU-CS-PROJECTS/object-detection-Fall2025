@@ -5,7 +5,7 @@ val: images/val
 
 
 names:
-  0: Vascular Bundles
+  0: Cross Section
   1: Vascular Bundles
 
 task: segment
