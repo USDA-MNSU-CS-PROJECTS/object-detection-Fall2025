@@ -56,15 +56,41 @@ def main():
         print("DEBUG: Starting training")
         results = model.train(
             data=DATA_CONFIG,
-            epochs=300,
+            epochs=400,       
             imgsz=640,
-            batch=32,
-            device=0,
+            batch=16,
+            device=2,
             project="runs/train",
-            name="exp_test",
+            name="exp_final_confidence_push",
             exist_ok=True,
             workers=8,
-            patience=50
+            patience=200,      
+            
+            #Confidence boosting:
+            cls=4.0,           
+            box=7.5,
+            dfl=1.5,
+            label_smoothing=0.0,
+            
+            #Augmentation for confidence:
+            hsv_h=0.003,       
+            hsv_s=0.2,         
+            hsv_v=0.15,        
+            degrees=2,         
+            translate=0.02,    
+            scale=0.15,        
+            fliplr=0.5,        
+            mosaic=0.3,        
+            mixup=0.0,         
+            copy_paste=0.0,    
+            dropout=0.0,
+            
+            #Fine-tuning learning rate:
+            lr0=0.005,  
+            lrf=0.005,
+            warmup_epochs=15,
+            close_mosaic=20,  
+            cos_lr=True,  
         )
         
         print("DEBUG: Training completed, sending notification")
