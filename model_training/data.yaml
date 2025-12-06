@@ -1,10 +1,11 @@
 path: /home/jovyan/work/DaveBotModelTraining/data
+#80/20 spilt
 train: images
-val: images
+val: images/val
 
-split: 0.8  #80% for training, 20% for validation
 
 names:
   0: Vascular Bundles
+  1: Vascular Bundles
 
 task: segment
