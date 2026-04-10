@@ -2,15 +2,15 @@
 
 ## Overview
 
-This project provides a complete pipeline for analyzing microscopic images of alfalfa stems. It features a web-based user interface built with Gradio for easy interaction, allowing users to upload images, run **two** YOLOv8 segmentation models (Casparian + Epidermis, and vascular bundles), post-process ring/Casparian noise, and receive detailed, research-ready outputs (CSV, overlays, optional debug dumps).
+This project provides a complete pipeline for analyzing microscopic images of alfalfa stems. It features a web-based user interface built with Gradio for easy interaction, allowing users to upload images, run an object detection model to identify key structures (cross-sections and vascular bundles), and receive detailed, research-ready outputs.
 
-The repository includes scripts for data downloading, model training, the main Gradio application, and a portable packaging system for easy distribution to end users.
+The core of this project is a YOLOv8 segmentation model trained to detect and segment vascular bundles in alfalfa stem . The repository includes scripts for data downloading, model training, the main Gradio application, and a portable packaging system for easy distribution to end users.
 
 ## Features
 
 - **Gradio Web Interface:** An intuitive UI for easy image analysis without needing to run complex scripts manually.
 - **Dual Pipelines:**
-  - **Full Analysis Pipeline:** Converts images, runs model A (Casparian + Epidermis) and model B (vascular bundles), applies noise handling in ROIs, computes geometry in microns, and generates CSV reports and overlay PNGs.
+  - **Full Analysis Pipeline:** Converts images, runs the YOLOv8 model, post-processes the results to calculate areas in microns, and generates CSV reports and research-style overlay images.
   - **Simple Image Converter:** A utility to convert `.nd2` microscopy files to `.png` format.
 - **Flexible File Handling:** Accepts `.nd2`, `.png`, and `.zip` files.
 - **Modular and Extensible:** The code is structured with a clear separation of concerns, making it easy to modify or extend.
@@ -20,33 +20,26 @@ The repository includes scripts for data downloading, model training, the main G
 ## Project Structure
 
 ```
-├── data/                       # Directory for input images (gitignored by default)
-├── debug_output/               # Optional debug logs/JSON from runs (gitignored)
-├── model_training/             # Scripts and configuration for model training
-│   ├── data.yaml               # Dataset configuration for YOLO
-│   ├── run.sh                  # SLURM script for HPC training
-│   └── train_yolov8_seg.py     # Main training script
-├── sample_trained_models/      # Pre-trained weights (add locally; see Configuration)
+├── data/                  # Directory for input images
+├── model_training/        # Scripts and configuration for model training
+│   ├── data.yaml          # Dataset configuration for YOLO
+│   ├── run.sh             # SLURM script for HPC training
+│   └── train_yolov8_seg.py # Main training script
+├── sample_trained_models/ # Pre-trained model weights
 ├── src/
-│   ├── app/                    # Gradio application
-│   │   ├── main.py             # Entry point
-│   │   ├── config/             # inference_constants, noise_profiles_app
-│   │   └── api/
+│   ├── app/               # Gradio application source code
+│   │   ├── main.py        # Main Gradio app entry point
+│   │   └── api/           # Backend modules for the app
 │   │       ├── converter.py
 │   │       ├── predictor.py
-│   │       ├── dual_stem_pipeline.py  # Default dual-model post-process + viz
-│   │       ├── stem_metrics.py
-│   │       ├── yolo_label_export.py
-│   │       ├── post_processor.py        # Legacy single-model viz (not default UI path)
-│   │       └── test_pipeline.py         # Integration smoke test
-│   ├── third_party/
-│   │   └── noise_deletion_clean/        # ROI noise detection (used by dual pipeline)
-│   ├── data_downloader/        # Box downloader (optional)
-│   ├── image_converters/       # .nd2 → .png helpers
-│   └── model_inference/        # Standalone inference scripts / docs
-├── setup_directories.py
-├── create_portable_package.bat
-├── environment.yml
+│   │       └── post_processor.py
+│   ├── data_downloader/   # Scripts for downloading data from Box
+│   └── image_converters/  # Scripts for converting .nd2 files to .png files
+│   └── model_inference/   # Scripts for running the trained YOLOv8 model
+│   └── post_processer/    # Scripts for post-processing the results from model inference
+├── create_portable_package.bat  # Build script for creating distributable package
+├── .gitignore
+├── environment.yml        # Conda environment definition
 └── README.markdown
 ```
 
@@ -171,13 +164,8 @@ The `model_training` directory contains the necessary files to train the YOLOv8 
 
 ## Configuration
 
-- **Models (Gradio):** Two weights in `sample_trained_models/`: `casparian_epidermis.pt` (Casparian + Epidermis) and `vascular_bundles.pt` (VB). Filenames and class names are set in `src/app/config/inference_constants.py`. Noise thresholds (PG/RR × ring/casp) — `src/app/config/noise_profiles_app.py`.
-- **Geometry metrics:** `src/app/api/stem_metrics.py`. Legacy single-model post-process remains in `src/app/api/post_processor.py` (not used by the default Gradio path).
-- **Bundled noise helpers:** `src/third_party/noise_deletion_clean` only ships `detection`, `masks`, and `profiles` (CLI/compare entry points were removed; Gradio is the supported path).
-
-### Visualization colors (default dual pipeline)
-
-Overlays written by `dual_stem_pipeline` use: **red** — epidermis contours; **deepskyblue** — selected main Casparian polygon; **green** (semi-transparent) — vascular bundles; **red-tinted semi-transparent** — detected noise mask over the image (not a YOLO class).
+- **Model Selection:** To change the model used by the Gradio application, update the `DEFAULT_MODEL_FILENAME` variable in `src/app/main.py`. For the portable distribution, the model path is automatically configured to use `models/best.pt` relative to the application directory.
+- **Post-Processing:** The pixel-to-micron ratio and other settings can be adjusted in `src/app/api/post_processor.py`.
 
 ## Distribution Package Details
 
@@ -187,7 +175,7 @@ The portable package created by `create_portable_package.bat` includes:
 
 - Complete Python 3.9 environment with all dependencies
 - The Gradio application and all backend modules
-- **Note:** The batch script copies `sample_trained_models/best.pt` to `portable_package/models/best.pt` if that file exists. The **current** `src/app/main.py` expects **two** weights under `sample_trained_models/` (`casparian_epidermis.pt` and `vascular_bundles.pt` per `inference_constants.py`). For development runs, use those two files; if you rely on the portable builder, copy or symlink both weights into the portable `models/` folder and align paths with your deployment (the generated launcher still references `models/best.pt` from older single-model flows).
+- Pre-trained YOLOv8 model (`best.pt`)
 - User-friendly launcher (`START_TOOL.bat`)
 - Comprehensive user documentation (`README.txt`)
 
@@ -200,7 +188,11 @@ The portable package created by `create_portable_package.bat` includes:
 
 ### Updating the Model
 
-To update weights in an existing portable package, replace the files under `portable_package/models/` with your new `.pt` files and ensure `main.py` / launcher paths match the filenames you use. If you still use the generated `best.pt` layout from `create_portable_package.bat`, replace `portable_package/models/best.pt`; for the dual-model app, supply both model A and B weights consistently with `inference_constants.py`.
+To update the model in an existing portable package:
+
+1. Replace `portable_package/models/best.pt` with the new model file
+2. Re-compress the folder for distribution
+3. No rebuild necessary!
 
 ### Performance Notes
 
