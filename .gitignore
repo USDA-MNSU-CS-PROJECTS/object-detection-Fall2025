@@ -10,3 +10,9 @@ portable_package/
 *.zip 
 *.7z 
 .codebuddy/ 
+appmap.log
+
+# Local debug artifacts (keep out of PRs)
+debug_output/
+**/raw_predictions_model_*.json
+**/post_processor_debug.log
