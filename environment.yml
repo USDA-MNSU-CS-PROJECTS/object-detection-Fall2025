@@ -12,8 +12,6 @@ dependencies:
   - ultralytics
   - shapely
   - scikit-image
-  - scipy
-  - scikit-learn
   - gradio=3.50.2 # only version that works with python 3.9
   - pytorch::pytorch
   - pytorch::torchvision

@@ -2,34 +2,24 @@ import pandas as pd
 import os
 import cv2
 import numpy as np
-import logging
 from shapely.geometry import Polygon
 from shapely.validation import make_valid
 from shapely.ops import unary_union
 import matplotlib.pyplot as plt
 
-# Debug logger: writes to file in output_dir, set in process_predictions
-_post_logger = logging.getLogger("post_processor_debug")
-
-
 class PostProcessor:
-    def __init__(self, output_dir, pixel_to_micron_ratio=0.9785316641067333, debug_log_dir=None):
+    def __init__(self, output_dir, pixel_to_micron_ratio=0.9785316641067333):
         """
         Initializes the PostProcessor.
 
         Args:
             output_dir (str): The directory to save post-processed visualizations.
             pixel_to_micron_ratio (float): The conversion factor from pixels to microns.
-            debug_log_dir (str, optional): If set, post_processor_debug.log is written here (e.g. project folder).
         """
         self.viz_output_dir = os.path.join(output_dir, "visualizations")
         os.makedirs(self.viz_output_dir, exist_ok=True)
         self.PIXEL_TO_MICRON = pixel_to_micron_ratio
         self.visualization_paths = []
-        log_dir = debug_log_dir if debug_log_dir else output_dir
-        self._log_path = os.path.join(log_dir, "post_processor_debug.log")
-        if debug_log_dir:
-            os.makedirs(debug_log_dir, exist_ok=True)
 
     def process_predictions(self, prediction_results: list) -> pd.DataFrame:
         """
@@ -44,36 +34,19 @@ class PostProcessor:
         records = []
         self.visualization_paths = []
 
-        # Setup file logging for this run
-        _post_logger.setLevel(logging.DEBUG)
-        _post_logger.handlers.clear()
-        fh = logging.FileHandler(self._log_path, mode="w", encoding="utf-8")
-        fh.setLevel(logging.DEBUG)
-        _post_logger.addHandler(fh)
-        _post_logger.info("=== Post-processor run started ===\n")
-
         for result in prediction_results:
             img_path = result.path
             img_name = os.path.basename(img_path)
             img = cv2.imread(img_path)
 
             if result.masks is None:
-                _post_logger.warning("No masks detected in %s", img_name)
                 print(f"Warning: No masks detected in {img_name}")
                 continue
 
             preds = self._collect_polygons(result)
-            # Log raw counts by class
-            by_class = {}
-            for p in preds:
-                cn = p["class_name"]
-                by_class[cn] = by_class.get(cn, 0) + 1
-            _post_logger.info("[%s] Raw model predictions: %s", img_name, by_class)
-
             main_poly, main_box = self._find_main_cross_section(preds, img.shape)
 
             if main_poly is None:
-                _post_logger.warning("No 'Cross Section' detected in %s", img_name)
                 print(f"Warning: No 'Cross Section' detected in {img_name}")
                 records.append({
                     "image_name": img_name,
@@ -86,19 +59,7 @@ class PostProcessor:
                 })
                 continue
 
-            main_cs_bbox = main_box["box"]
-            cs_x1, cs_y1, cs_x2, cs_y2 = main_cs_bbox[0], main_cs_bbox[1], main_cs_bbox[2], main_cs_bbox[3]
-            cs_area_bbox = (cs_x2 - cs_x1) * (cs_y2 - cs_y1)
-            _post_logger.info(
-                "[%s] Main Cross Section bbox (xyxy): x1=%.2f y1=%.2f x2=%.2f y2=%.2f | area_poly=%.2f perimeter=%.2f area_bbox=%.2f",
-                img_name, cs_x1, cs_y1, cs_x2, cs_y2, main_poly.area, main_poly.length, cs_area_bbox
-            )
-            vb_count_before = sum(1 for p in preds if p["class_name"] == "Vascular Bundles")
-            _post_logger.info("[%s] VB count before filter: %d", img_name, vb_count_before)
-
-            vb_polys = self._filter_vascular_bundles(main_box, preds, img_name)
-
-            _post_logger.info("[%s] VB count after filter: %d (dropped %d)\n", img_name, len(vb_polys), vb_count_before - len(vb_polys))
+            vb_polys = self._filter_vascular_bundles(main_box, preds)
             
             # Create complete cross section polygon that includes vascular bundles
             complete_cs_poly = self._create_complete_cross_section(main_poly, vb_polys)
@@ -225,34 +186,15 @@ class PostProcessor:
                     main_box = p
         return main_poly, main_box
 
-    def _filter_vascular_bundles(self, main_box, preds, img_name=""):
-        main_cs_bbox = main_box["box"]
-        x1, y1, x2, y2 = main_cs_bbox[0], main_cs_bbox[1], main_cs_bbox[2], main_cs_bbox[3]
+    def _filter_vascular_bundles(self, main_box, preds):
+        main_cs_bbox = main_box['box']
         vb_polys = []
-        for idx, p in enumerate(preds):
-            if p["class_name"] != "Vascular Bundles":
-                continue
-            vb_center_x, vb_center_y = self._polygon_center(p["points"])
-            inside = (
-                vb_center_x >= x1 and vb_center_x <= x2 and
-                vb_center_y >= y1 and vb_center_y <= y2
-            )
-            vb_area = p.get("area")
-            try:
-                vb_perim = Polygon(p["points"]).length
-            except Exception:
-                vb_perim = None
-            if inside:
-                vb_polys.append(p["points"])
-                _post_logger.debug(
-                    "[%s] VB #%d KEPT center=(%.2f, %.2f) area=%.2f perimeter=%.2f inside bbox",
-                    img_name, idx, vb_center_x, vb_center_y, vb_area or 0, vb_perim or 0
-                )
-            else:
-                _post_logger.info(
-                    "[%s] VB #%d DROPPED center=(%.2f, %.2f) area=%.2f perimeter=%.2f outside bbox (x1=%.2f y1=%.2f x2=%.2f y2=%.2f)",
-                    img_name, idx, vb_center_x, vb_center_y, vb_area or 0, vb_perim or 0, x1, y1, x2, y2
-                )
+        for p in preds:
+            if p["class_name"] == "Vascular Bundles":
+                vb_center_x, vb_center_y = self._polygon_center(p["points"])
+                if (vb_center_x >= main_cs_bbox[0] and vb_center_x <= main_cs_bbox[2] and
+                    vb_center_y >= main_cs_bbox[1] and vb_center_y <= main_cs_bbox[3]):
+                    vb_polys.append(p["points"])
         return vb_polys
 
     def _draw_research_style(self, img, main_poly, vb_polys, output_path):
@@ -260,7 +202,7 @@ class PostProcessor:
         ax.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         if main_poly:
             x, y = main_poly.exterior.xy
-            ax.plot(x, y, color="deepskyblue", linewidth=1.5)
+            ax.plot(x, y, color="red", linewidth=1.5)
         for vb in vb_polys:
             vb_poly = Polygon(vb)
             x, y = vb_poly.exterior.xy

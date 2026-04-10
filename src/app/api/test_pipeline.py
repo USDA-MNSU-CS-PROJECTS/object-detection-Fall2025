@@ -4,16 +4,10 @@ import shutil
 import unittest
 from unittest.mock import MagicMock
 
-_app = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-_third = os.path.abspath(os.path.join(_app, "..", "third_party"))
-for _p in (_third, _app):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-sys.path.append(os.path.join(_app, "api"))
+# Add the app directory to the path to allow imports from main
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from config.inference_constants import MODEL_A_CASPARIAN_EPIDERMIS, MODEL_B_VASCULAR_BUNDLES
 from main import run_full_pipeline
-
 
 class TestPipeline(unittest.TestCase):
 
@@ -21,22 +15,22 @@ class TestPipeline(unittest.TestCase):
         """
         Tests the full analysis pipeline with a sample PNG image.
         """
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        # Define the path to the sample image relative to the project root
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
         sample_image_path = os.path.join(project_root, "src", "data_downloader", "initial_test_result.png")
-        path_a = os.path.join(project_root, "sample_trained_models", MODEL_A_CASPARIAN_EPIDERMIS)
-        path_b = os.path.join(project_root, "sample_trained_models", MODEL_B_VASCULAR_BUNDLES)
-
+        
         self.assertTrue(os.path.exists(sample_image_path), f"Sample image not found at {sample_image_path}")
-        if not (os.path.isfile(path_a) and os.path.isfile(path_b)):
-            self.skipTest(
-                f"Skipping pipeline test: place YOLO weights as {MODEL_A_CASPARIAN_EPIDERMIS} and "
-                f"{MODEL_B_VASCULAR_BUNDLES} in sample_trained_models/"
-            )
 
+        # Create a mock file object that mimics Gradio's File object
         mock_file = MagicMock()
         mock_file.name = sample_image_path
-
-        csv_path, zip_path, status, df, temp_dir = run_full_pipeline(files=[mock_file])
+        
+        # Run the pipeline
+        csv_path, zip_path, status, df, temp_dir = run_full_pipeline(
+            files=[mock_file],
+            conf_threshold=0.25,
+            save_overlays=False
+        )
         
         try:
             # --- Assertions ---

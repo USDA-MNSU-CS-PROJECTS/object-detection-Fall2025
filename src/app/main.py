@@ -1,104 +1,22 @@
-﻿import gradio as gr
+import gradio as gr
 import os
 import sys
 import shutil
 import tempfile
-import gc
 import pandas as pd
 import zipfile
-import json
 
-_app_dir = os.path.dirname(os.path.abspath(__file__))
-_third_party = os.path.abspath(os.path.join(_app_dir, "..", "third_party"))
-_api_dir = os.path.join(_app_dir, "api")
-for _p in (_third_party, _app_dir):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-sys.path.append(_api_dir)
+# Add api folder to path
+sys.path.append(os.path.join(os.path.dirname(__file__), 'api'))
 
-from config.inference_constants import (
-    CLASS_CASPARIAN,
-    CLASS_CASPARIAN_FALLBACK,
-    DEFAULT_CONF_MODEL_A,
-    DEFAULT_CONF_MODEL_B,
-    MODEL_A_CASPARIAN_EPIDERMIS,
-    MODEL_B_VASCULAR_BUNDLES,
-)
+# Import APIs
 from converter import ImageConverter
 from predictor import ModelPredictor
-from dual_stem_pipeline import DualStemPipelineProcessor
+from post_processor import PostProcessor
 
-# Legacy single-model pipeline was removed from run_full_pipeline; see git history / post_processor.py.
-# DEFAULT_MODEL_FILENAME = "best_v2.pt"
-# DEFAULT_CONF_THRESHOLD = 0.80
-
-
-def _extract_raw_prediction_records(predictions, source_label="main"):
-    """Build JSON-serializable records from Ultralytics results (lightweight vs holding Results in RAM)."""
-    from shapely.geometry import Polygon
-    records = []
-    for result in predictions:
-        img_name = os.path.basename(result.path)
-        entry = {
-            "image_name": img_name,
-            "source": source_label,
-            "counts_by_class": {},
-            "vascular_bundles": [],
-            "cross_sections": [],
-        }
-        if result.masks is None:
-            entry["counts_by_class"] = {"Vascular Bundles": 0, "Cross Section": 0}
-            records.append(entry)
-            continue
-        for i, mask_xy in enumerate(result.masks.xy):
-            cls_idx = int(result.boxes.cls[i])
-            class_name = result.names[cls_idx]
-            entry["counts_by_class"][class_name] = entry["counts_by_class"].get(class_name, 0) + 1
-            bbox = result.boxes[i].xyxy[0].cpu().numpy().tolist()
-            conf = float(result.boxes.conf[i].cpu().numpy()) if result.boxes.conf is not None else None
-            try:
-                poly = Polygon(mask_xy)
-                cx, cy = float(poly.centroid.x), float(poly.centroid.y)
-                area_px = float(poly.area)
-                perimeter_px = float(poly.length)
-            except Exception:
-                cx, cy, area_px, perimeter_px = None, None, None, None
-            x1, y1, x2, y2 = bbox[0], bbox[1], bbox[2], bbox[3]
-            area_bbox = (x2 - x1) * (y2 - y1) if len(bbox) >= 4 else None
-            item = {
-                "center_xy": [cx, cy],
-                "bbox_xyxy": bbox,
-                "confidence": conf,
-                "area_pixels": area_px,
-                "perimeter_pixels": perimeter_px,
-                "area_bbox": area_bbox,
-                "n_contour_points": len(mask_xy),
-            }
-            if class_name == "Vascular Bundles":
-                entry["vascular_bundles"].append(item)
-            elif class_name in (CLASS_CASPARIAN_FALLBACK, CLASS_CASPARIAN):
-                entry["cross_sections"].append(item)
-        records.append(entry)
-    return records
-
-
-def _write_raw_predictions_json(records, output_dir, source_label="main"):
-    try:
-        safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in source_label)
-        path = os.path.join(output_dir, f"raw_predictions_{safe}.json")
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(records, f, indent=2, ensure_ascii=False)
-    except Exception:
-        pass
-
-
-def _save_raw_predictions_debug(predictions, output_dir, source_label="main"):
-    """Save raw model prediction summary (counts, VB/CS centers, bbox, conf, area) for debugging."""
-    try:
-        records = _extract_raw_prediction_records(predictions, source_label)
-        _write_raw_predictions_json(records, output_dir, source_label)
-    except Exception:
-        pass  # do not break pipeline if debug save fails
+# Configuration for the default model
+DEFAULT_MODEL_FILENAME = "C:/Users/Abi/Documents/GitHub/Dave-bot/sample_trained_models/best.pt"
+DEFAULT_CONF_THRESHOLD = 0.80
 
 
 def clear_all_analysis():
@@ -109,7 +27,7 @@ def clear_all_conversion():
     """Clear all conversion inputs and outputs"""
     return None, "", None
 
-def run_conversion(files, progress=gr.Progress()):
+def run_conversion(files):
     """Conversion-only pipeline"""
     if not files:
         return None, "No files uploaded."
@@ -224,53 +142,15 @@ def run_full_pipeline(files, progress=gr.Progress()):
         progress(0.4, desc=f"Running detection on {len(all_pngs_for_processing)} images...")
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(os.path.dirname(script_dir))
-        debug_output_dir = os.path.join(project_root, "debug_output")
-        os.makedirs(debug_output_dir, exist_ok=True)
-
-        models_dir = os.path.join(project_root, "sample_trained_models")
-        path_a = os.path.join(models_dir, MODEL_A_CASPARIAN_EPIDERMIS)
-        path_b = os.path.join(models_dir, MODEL_B_VASCULAR_BUNDLES)
-        missing = [p for p in (path_a, path_b) if not os.path.isfile(p)]
-        if missing:
-            msg = (
-                "Missing model weights. Place these files under sample_trained_models/:\n"
-                + "\n".join(missing)
-            )
-            return None, None, msg, None, temp_dir
-
-        n_img = len(all_pngs_for_processing)
-        predictor_a = ModelPredictor(path_a)
-        predictor_b = ModelPredictor(path_b)
-        processor = DualStemPipelineProcessor(output_dir, debug_log_dir=debug_output_dir)
-
-        all_dfs = []
-        all_viz: list[str] = []
-        all_records_a: list = []
-        all_records_b: list = []
-
-        for idx, path in enumerate(all_pngs_for_processing):
-            progress(
-                0.35 + 0.35 * (idx / max(n_img, 1)),
-                desc=f"Image {idx + 1}/{n_img}: models + postprocess...",
-            )
-            results_a = predictor_a.batch_predict([path], output_dir, DEFAULT_CONF_MODEL_A, save=False)
-            results_b = predictor_b.batch_predict([path], output_dir, DEFAULT_CONF_MODEL_B, save=False)
-            all_records_a.extend(_extract_raw_prediction_records(results_a, "model_a"))
-            all_records_b.extend(_extract_raw_prediction_records(results_b, "model_b"))
-            df_i = processor.process_batch(
-                [path], results_a, results_b, append_debug_log=(idx > 0)
-            )
-            all_dfs.append(df_i)
-            all_viz.extend(processor.visualization_paths)
-            del results_a, results_b
-            gc.collect()
-
-        _write_raw_predictions_json(all_records_a, debug_output_dir, source_label="model_a")
-        _write_raw_predictions_json(all_records_b, debug_output_dir, source_label="model_b")
-
-        progress(0.7, desc="Assembling results...")
-        df = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
-        viz_files = all_viz
+        model_path = os.path.join(project_root, "sample_trained_models", DEFAULT_MODEL_FILENAME)
+        predictor = ModelPredictor(model_path)
+        predictions = predictor.batch_predict(all_pngs_for_processing, output_dir, DEFAULT_CONF_THRESHOLD, save=False)
+        
+        # Post-process
+        progress(0.7, desc="Processing results and creating visualizations...")
+        processor = PostProcessor(output_dir)
+        df = processor.process_predictions(predictions)
+        viz_files = processor.visualization_paths
         
         # Save CSV
         csv_path = None
@@ -278,7 +158,7 @@ def run_full_pipeline(files, progress=gr.Progress()):
             csv_path = os.path.join(output_dir, "results.csv")
             df.to_csv(csv_path, index=False)
         
-        # Create a zip file with all the output images and debug files
+        # Create a zip file with all the output images
         progress(0.9, desc="Creating output archive...")
         output_zip_path = os.path.join(output_dir, "output_images.zip")
         with zipfile.ZipFile(output_zip_path, 'w') as zipf:
@@ -288,26 +168,6 @@ def run_full_pipeline(files, progress=gr.Progress()):
             # Add post-processor visualizations
             for viz_file in viz_files:
                 zipf.write(viz_file, os.path.join('visualizations', os.path.basename(viz_file)))
-            labels_dir = os.path.join(output_dir, "labels_generated")
-            if os.path.isdir(labels_dir):
-                for fn in os.listdir(labels_dir):
-                    fp = os.path.join(labels_dir, fn)
-                    if os.path.isfile(fp):
-                        zipf.write(fp, os.path.join("labels_generated", fn))
-            geom_dir = os.path.join(output_dir, "geometry_export")
-            if os.path.isdir(geom_dir):
-                for fn in os.listdir(geom_dir):
-                    fp = os.path.join(geom_dir, fn)
-                    if os.path.isfile(fp):
-                        zipf.write(fp, os.path.join("geometry_export", fn))
-            # Add debug files from project folder so they are in the zip too
-            log_path = os.path.join(debug_output_dir, "post_processor_debug.log")
-            if os.path.isfile(log_path):
-                zipf.write(log_path, "debug/post_processor_debug.log")
-            for pat in ("raw_predictions_model_a.json", "raw_predictions_model_b.json"):
-                raw_json = os.path.join(debug_output_dir, pat)
-                if os.path.isfile(raw_json):
-                    zipf.write(raw_json, os.path.join("debug", pat))
 
         status = f"Processed {len(all_pngs_for_processing)} images.\n"
         if not df.empty:
