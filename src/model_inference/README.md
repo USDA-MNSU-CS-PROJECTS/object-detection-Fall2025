@@ -8,4 +8,4 @@ This directory contains scripts for running inference using trained YOLOv8 model
     *   **Description**: A simple script to load a trained YOLOv8 model and run prediction on a set of images.
     *   **Usage**: Run this script directly.
     *   **Dependencies**: Requires `ultralytics`.
-    *   **Note**: The paths for the model (`sample_trained_models/best_multi_class_client_hpc.pt`) and input images (`test_images`) are currently hardcoded in the script and may need to be updated to match your local environment.
+    *   **Note**: The model path defaults to `sample_trained_models/` + `MODEL_B_VASCULAR_BUNDLES` from [`src/app/config/inference_constants.py`](../app/config/inference_constants.py) (vascular bundles weights). Input images use the `test_images` folder at the project root; adjust in `predict.py` if needed.
