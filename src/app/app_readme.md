@@ -1,13 +1,13 @@
 # Application Code Overview
 
-This document provides an overview of the core Python code that powers the Alfalfa Stem Object Detection Gradio application. The application is structured into a main Gradio interface (`main.py`) and several API modules (`converter.py`, `predictor.py`, `post_processor.py`) responsible for specific tasks.
+This document provides an overview of the core Python code that powers the Alfalfa Stem Object Detection Gradio application. The application is structured into a main Gradio interface (`main.py`) and API modules (`converter.py`, `predictor.py`, `dual_stem_pipeline.py`, `stem_metrics.py`, `post_processor.py` legacy).
 
 ## `src/app/main.py`
 -   **Purpose:** Serves as the main entry point for the Gradio application. It defines the user interface, handles file uploads, orchestrates the processing pipeline, and displays results.
 -   **Key Functions:**
     -   `run_conversion(files)`: Handles the "Simple Image Converter" pipeline, converting ND2 files to PNG and zipping them for download.
-    -   `run_full_pipeline(files, progress=gr.Progress())`: Manages the "Full Analysis Pipeline," which includes image conversion, model prediction, post-processing, and generating CSV reports and overlay images. The confidence threshold is configured via `DEFAULT_CONF_THRESHOLD` constant.
--   **Model Configuration:** The `DEFAULT_MODEL_FILENAME` and `DEFAULT_CONF_THRESHOLD` variables at the top of this file allow easy switching of the trained YOLO model and confidence threshold used for predictions.
+    -   `run_full_pipeline(files, progress=gr.Progress())`: Converts inputs, runs **two** YOLO models (`sample_trained_models/casparian_epidermis.pt` and `vascular_bundles.pt`), runs noise stages (ring + casp), builds extended CSV, zips visualizations, generated labels, and merged geometry.
+-   **Model configuration:** `src/app/config/inference_constants.py` (paths, class names, confidences). Noise PG/RR profiles: `src/app/config/noise_profiles_app.py`.
 -   **File Handling:** Accepts `.nd2`, `.png`, and `.zip` files. For `.zip` files, it extracts only `.nd2` and `.png` files, ignoring others and macOS metadata files (e.g., `._*`).
 
 ## `src/app/api/converter.py`
@@ -22,8 +22,14 @@ This document provides an overview of the core Python code that powers the Alfal
     -   `ModelPredictor.__init__(model_path)`: Initializes the YOLO model with a specified trained model file.
     -   `ModelPredictor.batch_predict(image_paths, output_dir, conf_threshold, save)`: Runs predictions on a list of image paths, applying a confidence threshold and optionally saving images with prediction overlays.
 
+## `src/app/api/dual_stem_pipeline.py`
+-   **Purpose:** Orchestrates model A + model B outputs, YOLO label export, in-memory `detect_noise_mask` (ring and casp), merged noise union, calls `stem_metrics`, writes visualizations.
+
+## `src/app/api/stem_metrics.py`
+-   **Purpose:** Central place for geometric metrics (ring area, mean thickness via skeleton + distance transform, casp/epi areas with/without noise, VB counts and ratios).
+
 ## `src/app/api/post_processor.py`
--   **Purpose:** Processes the raw prediction results from the YOLO model, performs calculations (e.g., area in microns), and generates research-style visualizations.
+-   **Purpose (legacy):** Single-model pipeline with Cross Section + Vascular Bundles; kept for reference — default Gradio flow uses `dual_stem_pipeline.py` instead.
 -   **Key Functions:**
     -   `PostProcessor.__init__(output_dir, pixel_to_micron_ratio)`: Initializes the post-processor, setting up output directories and the pixel-to-micron conversion ratio.
     -   `PostProcessor.process_predictions(prediction_results)`: Takes a list of YOLO prediction result objects, extracts mask and bounding box data, calculates areas, filters for "Cross Section" and "Vascular Bundles," and generates a pandas DataFrame of results.
