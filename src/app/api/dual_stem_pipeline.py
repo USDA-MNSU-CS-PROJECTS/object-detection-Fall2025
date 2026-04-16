@@ -18,11 +18,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from PIL import Image
-from shapely.geometry import Polygon
+from shapely.geometry import Point, Polygon
 from shapely.validation import make_valid
 
 from noise_deletion_clean.detection import detect_noise_mask
-from noise_deletion_clean.masks import build_casp_inside_mask, build_ring_roi
+from noise_deletion_clean.masks import build_casp_inside_mask, build_ring_roi, polygons_to_pixel_mask
 
 from config.inference_constants import (
     CLASS_CASPARIAN,
@@ -31,12 +31,20 @@ from config.inference_constants import (
     CLASS_VASCULAR_BUNDLES,
     MODEL_A_EPIDERMIS_KEEP_NEAREST_TO_CENTER,
     MODEL_A_SWAP_EPI_CASP_LABELS,
+    PIPELINE_EXPORT_METRIC_DEBUG_VIZ,
+    PIPELINE_WRITE_OVERLAY_VISUALIZATIONS,
     PIXEL_TO_MICRON,
     YOLO_CLASS_CASPARIAN,
     YOLO_CLASS_EPIDERMIS,
 )
 from config.noise_profiles_app import DEFAULT_STAGE, app_params_for_stage
-from stem_metrics import compute_stem_metric_row
+from filename_metadata import parse_image_filename_metadata
+from stem_metrics import (
+    build_na_row,
+    compute_stem_metric_row,
+    export_metric_debug_visualizations,
+    order_result_dataframe,
+)
 from yolo_label_export import (
     result_to_polygons_by_class,
     write_merged_label_with_noise,
@@ -92,27 +100,25 @@ def _polygon_center(points):
     return Polygon(points).centroid.x, Polygon(points).centroid.y
 
 
-def _find_main_casparian(preds, img_shape):
-    if MODEL_A_SWAP_EPI_CASP_LABELS:
-        # Biology: casparian inside epidermis; model names that inner mask "Epidermis".
-        casp_names = (CLASS_EPIDERMIS, CLASS_CASPARIAN_FALLBACK)
-    else:
-        casp_names = (CLASS_CASPARIAN, CLASS_CASPARIAN_FALLBACK)
-    h, w = img_shape[:2]
-    img_center = np.array([w / 2, h / 2])
-    min_dist = float("inf")
-    main_poly = None
-    main_box = None
-    for p in preds:
-        if p["class_name"] not in casp_names:
-            continue
-        cx, cy = _polygon_center(p["points"])
-        dist = np.linalg.norm(img_center - np.array([cx, cy]))
-        if dist < min_dist:
-            min_dist = dist
-            main_poly = Polygon(p["points"])
-            main_box = p
-    return main_poly, main_box
+def _shapely_polygon_from_normalized(
+    pts: list[tuple[float, float]],
+    h: int,
+    w: int,
+) -> Polygon | None:
+    if len(pts) < 3:
+        return None
+    wx = max(w - 1, 1)
+    hx = max(h - 1, 1)
+    pts_px = [(float(x) * wx, float(y) * hx) for x, y in pts]
+    poly = Polygon(pts_px)
+    if not poly.is_valid:
+        poly = make_valid(poly)
+    if poly.is_empty:
+        return None
+    if poly.geom_type == "Polygon":
+        return poly
+    geoms = [g for g in getattr(poly, "geoms", []) if g.geom_type == "Polygon" and not g.is_empty]
+    return max(geoms, key=lambda g: g.area) if geoms else None
 
 
 def _filter_epidermis_polygons_nearest_to_center(
@@ -155,16 +161,52 @@ def _filter_epidermis_polygons_nearest_to_center(
     return [scored[0][2]]
 
 
-def _filter_vascular_bundles(main_box, preds):
-    if main_box is None:
+def _filter_casparian_to_single_inside_epidermis(
+    casp_norm_polys: list[list[tuple[float, float]]],
+    epi_norm_poly: list[tuple[float, float]],
+    h: int,
+    w: int,
+    img_name: str,
+) -> list[list[tuple[float, float]]]:
+    """Keep one Casparian: prefer centroids inside chosen epidermis; else nearest to image center."""
+    epi = _shapely_polygon_from_normalized(epi_norm_poly, h, w)
+    if epi is None:
         return []
-    x1, y1, x2, y2 = main_box["box"][0], main_box["box"][1], main_box["box"][2], main_box["box"][3]
-    vb_polys = []
+    img_center = np.array([w / 2.0, h / 2.0])
+    scored_inside: list[tuple[float, list[tuple[float, float]]]] = []
+    scored_all: list[tuple[float, list[tuple[float, float]]]] = []
+    for pts in casp_norm_polys:
+        if len(pts) < 3:
+            continue
+        c_poly = _shapely_polygon_from_normalized(pts, h, w)
+        if c_poly is None:
+            continue
+        cx, cy = float(c_poly.centroid.x), float(c_poly.centroid.y)
+        dist = float(np.linalg.norm(img_center - np.array([cx, cy])))
+        scored_all.append((dist, pts))
+        if epi.covers(Point(cx, cy)):
+            scored_inside.append((dist, pts))
+    pool = scored_inside if scored_inside else scored_all
+    if not pool:
+        return []
+    if not scored_inside and scored_all:
+        _post_logger.info(
+            "[%s] Casparian: no centroid inside epidermis; using nearest-to-center among all",
+            img_name,
+        )
+    pool.sort(key=lambda t: t[0])
+    return [pool[0][1]]
+
+
+def _filter_vascular_bundles(epi_polygon: Polygon | None, preds):
+    if epi_polygon is None or epi_polygon.is_empty:
+        return []
+    vb_polys: list = []
     for p in preds:
         if p["class_name"] != CLASS_VASCULAR_BUNDLES:
             continue
         cx, cy = _polygon_center(p["points"])
-        if x1 <= cx <= x2 and y1 <= cy <= y2:
+        if epi_polygon.covers(Point(cx, cy)):
             vb_polys.append(p["points"])
     return vb_polys
 
@@ -229,7 +271,8 @@ def _draw_dual_viz(
 class DualStemPipelineProcessor:
     def __init__(self, output_dir: str, debug_log_dir: str | None = None, pixel_to_micron: float | None = None):
         self.viz_output_dir = os.path.join(output_dir, "visualizations")
-        os.makedirs(self.viz_output_dir, exist_ok=True)
+        if PIPELINE_WRITE_OVERLAY_VISUALIZATIONS:
+            os.makedirs(self.viz_output_dir, exist_ok=True)
         self.PIXEL_TO_MICRON = pixel_to_micron if pixel_to_micron is not None else PIXEL_TO_MICRON
         self.visualization_paths: list[str] = []
         log_dir = debug_log_dir if debug_log_dir else output_dir
@@ -238,27 +281,11 @@ class DualStemPipelineProcessor:
             os.makedirs(debug_log_dir, exist_ok=True)
         self._labels_dir = os.path.join(output_dir, "labels_generated")
         self._geom_dir = os.path.join(output_dir, "geometry_export")
+        self._metric_debug_dir = os.path.join(output_dir, "metric_debug_viz")
         os.makedirs(self._labels_dir, exist_ok=True)
         os.makedirs(self._geom_dir, exist_ok=True)
-
-    def _na_row(self, img_name: str, note: str) -> dict:
-        return {
-            "image_name": img_name,
-            "ring_area_um2": "N/A",
-            "ring_area_minus_noise_um2": "N/A",
-            "mean_ring_thickness_um": "N/A",
-            "mean_ring_thickness_minus_noise_um": "N/A",
-            "casp_area_um2": "N/A",
-            "casp_area_minus_noise_um2": "N/A",
-            "epidermis_area_um2": "N/A",
-            "epidermis_area_minus_noise_um2": "N/A",
-            "vb_count": "N/A",
-            "vb_area_microns": "N/A",
-            "avg_vb_area_microns": "N/A",
-            "cs_area_microns": "N/A",
-            "vb_to_cs_ratio": "N/A",
-            "notes": note,
-        }
+        if PIPELINE_EXPORT_METRIC_DEBUG_VIZ:
+            os.makedirs(self._metric_debug_dir, exist_ok=True)
 
     def process_batch(
         self,
@@ -288,48 +315,64 @@ class DualStemPipelineProcessor:
                 _post_logger.warning("Cannot read image %s", img_name)
                 continue
 
-            preds_a = _collect_polygons(ra)
             preds_b = _collect_polygons(rb)
-
-            main_poly, main_box = _find_main_casparian(preds_a, img_bgr.shape)
-            vb_polys = _filter_vascular_bundles(main_box, preds_b)
-
-            if main_poly is None or main_box is None:
-                _post_logger.warning("No main Casparian/Cross Section in %s", img_name)
-                records.append(self._na_row(img_name, "No Casparian / Cross Section"))
-                continue
 
             cmap = _class_map_model_a(ra)
             if not cmap:
                 _post_logger.warning("Model A has no expected class names in %s", img_name)
-                records.append(self._na_row(img_name, "Model A class names mismatch"))
+                records.append(build_na_row(img_name, "Model A class names mismatch"))
                 continue
 
             polys_by_class = result_to_polygons_by_class(ra, cmap, img_bgr.shape)
             if YOLO_CLASS_CASPARIAN not in polys_by_class or not polys_by_class.get(YOLO_CLASS_CASPARIAN):
                 _post_logger.warning("No Casparian polygons after export in %s", img_name)
-                records.append(self._na_row(img_name, "No Casparian mask"))
+                records.append(build_na_row(img_name, "No Casparian mask"))
                 continue
             if YOLO_CLASS_EPIDERMIS not in polys_by_class or not polys_by_class.get(YOLO_CLASS_EPIDERMIS):
                 _post_logger.warning("No Epidermis polygons in %s (ring ROI needs class 1)", img_name)
-                records.append(self._na_row(img_name, "No Epidermis mask"))
+                records.append(build_na_row(img_name, "No Epidermis mask"))
                 continue
 
             h, w = img_bgr.shape[:2]
-            if MODEL_A_EPIDERMIS_KEEP_NEAREST_TO_CENTER:
-                epi_all = polys_by_class[YOLO_CLASS_EPIDERMIS]
+            epi_all = polys_by_class[YOLO_CLASS_EPIDERMIS]
+            if len(epi_all) > 1:
+                if not MODEL_A_EPIDERMIS_KEEP_NEAREST_TO_CENTER:
+                    _post_logger.info(
+                        "[%s] Epidermis: %d polygons; collapsing to one (nearest to center) for single-stem pipeline",
+                        img_name,
+                        len(epi_all),
+                    )
                 epi_one = _filter_epidermis_polygons_nearest_to_center(epi_all, h, w)
                 if not epi_one:
                     _post_logger.warning("Epidermis nearest-to-center filter left no polygons in %s", img_name)
-                    records.append(self._na_row(img_name, "Epidermis filter empty"))
+                    records.append(build_na_row(img_name, "Epidermis filter empty"))
                     continue
-                if len(epi_all) > 1:
+                if MODEL_A_EPIDERMIS_KEEP_NEAREST_TO_CENTER:
                     _post_logger.info(
                         "[%s] Epidermis: kept 1 of %d polygons (nearest centroid to image center)",
                         img_name,
                         len(epi_all),
                     )
                 polys_by_class[YOLO_CLASS_EPIDERMIS] = epi_one
+
+            epi_norm = polys_by_class[YOLO_CLASS_EPIDERMIS][0]
+            casp_all = list(polys_by_class[YOLO_CLASS_CASPARIAN])
+            casp_one = _filter_casparian_to_single_inside_epidermis(
+                casp_all, epi_norm, h, w, img_name
+            )
+            if not casp_one:
+                _post_logger.warning("No Casparian polygons after epidermis filter in %s", img_name)
+                records.append(build_na_row(img_name, "Casparian filter empty"))
+                continue
+            polys_by_class[YOLO_CLASS_CASPARIAN] = casp_one
+
+            epi_polygon = _shapely_polygon_from_normalized(epi_norm, h, w)
+            main_poly = _shapely_polygon_from_normalized(casp_one[0], h, w)
+            vb_polys = _filter_vascular_bundles(epi_polygon, preds_b)
+            if main_poly is None:
+                _post_logger.warning("Invalid Casparian polygon geometry in %s", img_name)
+                records.append(build_na_row(img_name, "Casparian geometry invalid"))
+                continue
 
             label_path = os.path.join(self._labels_dir, f"{_stem(img_path)}.txt")
             write_yolo_seg_label_txt(label_path, polys_by_class)
@@ -343,21 +386,44 @@ class DualStemPipelineProcessor:
             noise_casp = detect_noise_mask(rgb, roi_casp, pr_casp)
             # Bitwise OR merges ring + casp noise for class-2 YOLO labels and area metrics.
             noise_union = np.clip(noise_ring.astype(np.uint8) | noise_casp.astype(np.uint8), 0, 1)
+            epi_mask_arr = polygons_to_pixel_mask(h, w, polys_by_class[YOLO_CLASS_EPIDERMIS])
+            noise_union = (noise_union & epi_mask_arr).astype(np.uint8)
 
             merged_geom = os.path.join(self._geom_dir, f"{_stem(img_path)}_geometry_merged.txt")
             write_merged_label_with_noise(merged_geom, polys_by_class, noise_union, h, w)
 
             metrics = compute_stem_metric_row(
-                h, w, polys_by_class, noise_union, vb_polys, main_poly, self.PIXEL_TO_MICRON
+                h, w, polys_by_class, noise_union, vb_polys, self.PIXEL_TO_MICRON
             )
-            metrics["image_name"] = img_name
-            metrics["notes"] = ""
-            records.append(metrics)
+            if PIPELINE_EXPORT_METRIC_DEBUG_VIZ:
+                try:
+                    export_metric_debug_visualizations(
+                        debug_root=self._metric_debug_dir,
+                        image_stem=_stem(img_path),
+                        height=h,
+                        width=w,
+                        polygons_by_class=polys_by_class,
+                        noise_union=noise_union,
+                        vb_polys=vb_polys,
+                        pixel_to_micron=self.PIXEL_TO_MICRON,
+                    )
+                except Exception as exc:
+                    _post_logger.warning("[%s] metric_debug_viz failed: %s", img_name, exc)
+            meta = parse_image_filename_metadata(img_name)
+            parse_ok = meta.pop("parse_ok")
+            notes = "" if parse_ok else "filename_parse_failed"
+            records.append({**meta, **metrics, "notes": notes})
 
-            out_png = os.path.join(self.viz_output_dir, img_name)
-            epi_polys = polys_by_class.get(YOLO_CLASS_EPIDERMIS, [])
-            _draw_dual_viz(img_bgr, main_poly, vb_polys, noise_union, out_png, epidermis_polys=epi_polys)
-            self.visualization_paths.append(out_png)
-            _post_logger.info("[%s] vb_count=%s ring_um2=%s", img_name, metrics.get("vb_count"), metrics.get("ring_area_um2"))
+            if PIPELINE_WRITE_OVERLAY_VISUALIZATIONS:
+                out_png = os.path.join(self.viz_output_dir, img_name)
+                epi_polys = polys_by_class.get(YOLO_CLASS_EPIDERMIS, [])
+                _draw_dual_viz(img_bgr, main_poly, vb_polys, noise_union, out_png, epidermis_polys=epi_polys)
+                self.visualization_paths.append(out_png)
+            _post_logger.info(
+                "[%s] vb_count=%s Epi_casp_zone_um2=%s",
+                img_name,
+                metrics.get("Vb_count"),
+                metrics.get("Epi_casp_zone_area_um2"),
+            )
 
-        return pd.DataFrame(records)
+        return order_result_dataframe(pd.DataFrame(records))
