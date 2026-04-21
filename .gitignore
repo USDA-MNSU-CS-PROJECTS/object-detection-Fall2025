@@ -16,3 +16,6 @@ appmap.log
 debug_output/
 **/raw_predictions_model_*.json
 **/post_processor_debug.log
+
+# IDE files
+.idea/

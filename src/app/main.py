@@ -329,7 +329,7 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
         with gr.TabItem("Full Detection Pipeline"):
             with gr.Row():
                 with gr.Column(scale=2):
-                    analysis_files = gr.File(label="Upload ND2, PNG, or ZIP files", file_count="multiple", file_types=[".nd2", ".png", ".zip"])
+                    analysis_files = gr.File(label="Upload ND2, PNG, or ZIP files with RR or PG in the filename", file_count="multiple", file_types=[".nd2", ".png", ".zip"])
                     analysis_btn = gr.Button("Run Analysis", variant="primary")
                 
                 with gr.Column(scale=3):
