@@ -19,6 +19,7 @@ echo Step 2: Installing dependencies (CPU-only for smaller size)...
 pip install gradio==3.50.2
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 pip install ultralytics pillow pandas numpy nd2reader nd2 shapely scikit-image tifffile
+pip install scikit-learn
 
 echo.
 echo Step 3: Creating portable package folder structure...
@@ -26,17 +27,30 @@ if exist portable_package rmdir /s /q portable_package
 mkdir portable_package
 mkdir portable_package\app
 mkdir portable_package\app\api
+mkdir portable_package\app\config
 mkdir portable_package\models
+mkdir portable_package\third_party
+mkdir portable_package\third_party\noise_deletion_clean
 
 echo.
 echo Step 4: Copying application files...
 copy src\app\main.py portable_package\app\
 copy src\app\api\*.py portable_package\app\api\
-if exist sample_trained_models\best.pt (
-    copy sample_trained_models\best.pt portable_package\models\
+copy src\app\config\*.py portable_package\app\config\
+copy src\third_party\noise_deletion_clean\*.py portable_package\third_party\noise_deletion_clean\
+if exist sample_trained_models\casparian_epidermis.pt (
+    copy sample_trained_models\casparian_epidermis.pt portable_package\models\
 ) else (
-    echo WARNING: best.pt not found in sample_trained_models\
-    echo You'll need to copy it manually later!
+    echo WARNING: casparian_epidermis.pt not found!
+    echo You'll need to add this model manually later
+    pause
+)
+
+if exist sample_trained_models\vascular_bundles.pt (
+    copy sample_trained_models\vascular_bundles.pt portable_package\models\
+) else (
+    echo WARNING: vascular_bundles.pt not found!
+    echo You'll need to add this model manually later
     pause
 )
 
@@ -72,17 +86,22 @@ echo.
 echo cd /d "%%~dp0"
 echo set PYTHONPATH=%%CD%%\app
 echo.
-echo REM Check if model exists
-echo if not exist "models\best.pt" ^(
-echo     echo ERROR: Model file not found!
-echo     echo Expected location: models\best.pt
+echo REM Check if model files exist
+echo if not exist "models\casparian_epidermis.pt" ^(
+echo     echo ERROR: casparian_epidermis.pt not found!
+echo     echo Expected location: models\casparian_epidermis.pt
 echo     echo.
 echo     pause
 echo     exit /b 1
 echo ^)
 echo.
-echo REM Update the model path in main.py on-the-fly
-echo set MODEL_PATH=%%CD%%\models\best.pt
+echo if not exist "models\vascular_bundles.pt" ^(
+echo     echo ERROR: vascular_bundles.pt not found!
+echo     echo Expected location: models\vascular_bundles.pt
+echo     echo.
+echo     pause
+echo     exit /b 1
+echo ^)
 echo.
 echo REM Start the application
 echo python_env\python.exe app\main.py
@@ -176,7 +195,7 @@ echo Solution: Manually open your browser and go to:
 echo           http://127.0.0.1:7860
 echo.
 echo Problem: "Model file not found" error
-echo Solution: Make sure the "models" folder contains best.pt
+echo Solution: Make sure the "models" folder contains casparian_epidermis.pt and vascular_bundles.pt
 echo.
 echo Problem: Application won't start
 echo Solution: 1. Make sure you unzipped the ENTIRE folder
@@ -193,8 +212,9 @@ echo UPDATING THE MODEL
 echo ========================================
 echo.
 echo To update to a newer model version:
-echo 1. Replace the file: models\best.pt
-echo 2. Restart the application
+echo 1. Replace the file: models\casparian_epidermis.pt
+echo 2. Replace the file: models\vascular_bundles.pt
+echo 3. Restart the application
 echo.
 echo No reinstallation needed!
 echo.
@@ -229,12 +249,13 @@ echo.
 echo Location: C:\Users\Abi\Documents\GitHub\Dave-bot\portable_package\
 echo.
 echo Package contains:
-echo   - START_TOOL.bat           (Main launcher - clients click this!)
-echo   - README.txt               (User instructions)
-echo   - Create_Desktop_Shortcut.bat  (Optional - creates desktop shortcut)
-echo   - app\                     (Your application code)
-echo   - models\best.pt           (AI model)
-echo   - python_env\              (Complete Python 3.9 environment)
+echo   - START_TOOL.bat                (Main launcher - clients click this!)
+echo   - README.txt                    (User instructions)
+echo   - Create_Desktop_Shortcut.bat   (Optional - creates desktop shortcut)
+echo   - app\                          (Your application code)
+echo   - models\casparian_epidermis.pt (AI model)
+echo   - models\vascular_bundles.pt    (AI model)
+echo   - python_env\                   (Complete Python 3.9 environment)
 echo.
 echo Approximate size: 1-1.5 GB
 echo.

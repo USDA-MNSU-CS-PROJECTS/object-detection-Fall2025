@@ -227,7 +227,12 @@ def run_full_pipeline(files, progress=gr.Progress()):
         debug_output_dir = os.path.join(project_root, "debug_output")
         os.makedirs(debug_output_dir, exist_ok=True)
 
-        models_dir = os.path.join(project_root, "sample_trained_models")
+        models_dir = os.path.join(project_root, "models")
+
+        # fallback for development
+        if not os.path.isdir(models_dir):
+            models_dir = os.path.join(project_root, "sample_trained_models")
+            
         path_a = os.path.join(models_dir, MODEL_A_CASPARIAN_EPIDERMIS)
         path_b = os.path.join(models_dir, MODEL_B_VASCULAR_BUNDLES)
         missing = [p for p in (path_a, path_b) if not os.path.isfile(p)]
