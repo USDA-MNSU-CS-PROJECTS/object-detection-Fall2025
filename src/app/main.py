@@ -305,6 +305,16 @@ def run_full_pipeline(files, progress=gr.Progress()):
                     fp = os.path.join(geom_dir, fn)
                     if os.path.isfile(fp):
                         zipf.write(fp, os.path.join("geometry_export", fn))
+            # Per-metric debug PNGs (export_metric_debug_visualizations in stem_metrics)
+            metric_debug_dir = os.path.join(output_dir, "metric_debug_viz")
+            if os.path.isdir(metric_debug_dir):
+                for root, _dirs, files in os.walk(metric_debug_dir):
+                    for fn in files:
+                        fp = os.path.join(root, fn)
+                        if os.path.isfile(fp):
+                            rel = os.path.relpath(fp, metric_debug_dir)
+                            arcname = os.path.join("metric_debug_viz", rel).replace("\\", "/")
+                            zipf.write(fp, arcname)
             # Add debug files from project folder so they are in the zip too
             log_path = os.path.join(debug_output_dir, "post_processor_debug.log")
             if os.path.isfile(log_path):
