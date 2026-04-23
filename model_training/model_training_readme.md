@@ -1,12 +1,25 @@
-# YOLOv8 Segmentation Model Training on HPC
+# YOLOv8 segmentation training (Dave-bot)
 
-This repository contains scripts and configuration files for training a YOLOv8 segmentation model to identify Cross Sections and Vascular Bundles in microscopy images using Professor Flint Million's GPU on JupyterLab.
+This **directory** is part of the Dave-bot monorepo, not a standalone project. Repo-wide setup, the Gradio app, and portable packaging are documented in [`README.markdown`](../README.markdown) at the repository root.
+
+These files train a YOLOv8 instance-segmentation model (historically used on a JupyterLab GPU node). Trained weights for the web UI belong under `sample_trained_models/` with names configured in `src/app/config/inference_constants.py`.
+
+> [!IMPORTANT]
+> This training folder primarily documents a **legacy single-model training path** (`Cross Section` + `Vascular Bundles`).
+> The current production Gradio runtime is **dual-model** (`src/app/main.py`):
+> - model A: Casparian Strip + Epidermis
+> - model B: Vascular Bundles
+>
+> Keep this distinction explicit when using or updating this document.
 
 ## Overview
 
-This project trains a YOLOv8 instance segmentation model to detect and segment:
+The training script targets:
 - **Cross Section**: Plant tissue cross sections
 - **Vascular Bundles**: Vascular bundle structures within the tissue
+
+This is compatible with older/single-model experiments. It is not a 1:1 description of the current dual-model app runtime.
+
 ---
 
 ## Prerequisites
@@ -42,20 +55,29 @@ dataset/
 
 ---
 
-## File Structure
+## Layout in this repo
 
 ```
-project/
-├── README.md                    # This file
-├── data.yaml                    # Dataset configuration
-├── train_yolov8_seg.py         # Main training script
-└── runs/                       # Training outputs (created automatically)
-    └── train/
-        └── exp_*/
-            ├── weights/
-            │   ├── best.pt     # Best model checkpoint
-            │   └── last.pt     # Last epoch checkpoint
-            └── results.png     # Training metrics visualization
+Dave-bot/
+├── README.markdown
+├── model_training/                 # this folder
+│   ├── model_training_readme.md    # this file
+│   ├── data.yaml                   # YOLO dataset config (edit paths + class names)
+│   └── train_yolov8_seg.py         # main training script
+├── sample_trained_models/          # place exported .pt files for Gradio (see inference_constants)
+└── src/
+    └── app/                        # consumes trained weights in production
+```
+
+When you run `train_yolov8_seg.py` from `model_training/`, Ultralytics creates outputs under **`runs/train/exp_*/`** (relative to the current working directory), for example:
+
+```
+runs/train/exp_*/
+├── weights/
+│   ├── best.pt
+│   └── last.pt
+├── results.png
+└── ...
 ```
 
 ---
@@ -99,6 +121,21 @@ results = model.train(
 # Run training (runs on device #2)
 CUDA_VISIBLE_DEVICES=2 python train_yolov8_seg.py
 ```
+
+## Relationship to current app runtime
+
+Current `src/app/main.py` expects two model files in `sample_trained_models/`:
+
+- `casparian_epidermis.pt`
+- `vascular_bundles.pt`
+
+If you use this training flow:
+
+- outputs under `runs/train/.../weights/best.pt` are valid YOLO artifacts,
+- but you must map/export them deliberately to the app's expected filenames and class semantics,
+- and ensure class names in `data.yaml` match the model role you want (legacy single-model vs current dual-model pipeline).
+
+In short: this folder is still useful for experimentation/training, but it should be treated as a separate workflow from the production dual-model UI path unless you explicitly align classes + filenames.
 
 
 ## Configuration

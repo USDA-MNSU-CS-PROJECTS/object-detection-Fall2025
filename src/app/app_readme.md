@@ -1,6 +1,6 @@
 # Application Code Overview
 
-This document provides an overview of the core Python code that powers the Alfalfa Stem Object Detection Gradio application. The application is structured into a main Gradio interface (`main.py`) and API modules (`converter.py`, `predictor.py`, `dual_stem_pipeline.py`, `stem_metrics.py`, `post_processor.py` legacy).
+This document provides an overview of the core Python code that powers the Alfalfa Stem Object Detection Gradio application. The application is structured into a main Gradio interface (`main.py`) and API modules (`converter.py`, `predictor.py`, `dual_stem_pipeline.py`, `stem_metrics.py`, `yolo_label_export.py`, `filename_metadata.py`, `post_processor.py` legacy).
 
 ## `src/app/main.py`
 -   **Purpose:** Serves as the main entry point for the Gradio application. It defines the user interface, handles file uploads, orchestrates the processing pipeline, and displays results.
@@ -28,8 +28,17 @@ This document provides an overview of the core Python code that powers the Alfal
 ## `src/app/api/stem_metrics.py`
 -   **Purpose:** Central place for geometric metrics (ring area, mean thickness via skeleton + distance transform, casp/epi areas with/without noise, VB counts and ratios).
 
+## `src/app/api/yolo_label_export.py`
+-   **Purpose:** Converts Ultralytics segmentation mask results into normalized polygon coordinates (YOLO-seg label style) for export alongside the dual pipeline.
+-   **Key items:** `result_to_polygons_by_class(...)`, `write_yolo_seg_label_txt(...)` — used when writing label `.txt` files that align with `noise_deletion_clean` expectations.
+
+## `src/app/api/filename_metadata.py`
+-   **Purpose:** Parses experiment metadata from image basenames (fixed stem regex), e.g. incubation time, magnification, stitch/code fields for CSV columns.
+-   **Key function:** `parse_image_filename_metadata(basename_with_ext)` — returns a dict with structured fields and `parse_ok` when the pattern matches.
+
 ## `src/app/api/post_processor.py`
 -   **Purpose (legacy):** Single-model pipeline with Cross Section + Vascular Bundles; kept for reference — default Gradio flow uses `dual_stem_pipeline.py` instead.
+-   **Status:** Legacy/manual reference module; not part of the default runtime path in `src/app/main.py`.
 -   **Key Functions:**
     -   `PostProcessor.__init__(output_dir, pixel_to_micron_ratio)`: Initializes the post-processor, setting up output directories and the pixel-to-micron conversion ratio.
     -   `PostProcessor.process_predictions(prediction_results)`: Takes a list of YOLO prediction result objects, extracts mask and bounding box data, calculates areas, filters for "Cross Section" and "Vascular Bundles," and generates a pandas DataFrame of results.
@@ -38,9 +47,11 @@ This document provides an overview of the core Python code that powers the Alfal
 ## `src/app/api/test_converter.py`
 -   **Purpose:** Test script for validating the `ImageConverter` module.
 -   **Functionality:** Tests both single file and directory conversion of ND2 to PNG. Requires manual setup of test ND2 files.
+-   **Status:** Manual test utility (not CI-gated runtime logic).
 
 ## `src/app/api/test_pipeline.py`
 -   **Purpose:** Unit test for the full analysis pipeline.
 -   **Functionality:** Tests the `run_full_pipeline` function end-to-end using a sample PNG image. Uses Python's `unittest` framework.
+-   **Status:** Optional local smoke test; not required to run the ND2 -> PNG conversion flow.
 
 This structure ensures a clear separation of concerns, making the application modular and maintainable.
