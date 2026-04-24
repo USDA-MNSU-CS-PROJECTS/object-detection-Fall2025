@@ -1,7 +1,4 @@
-from .tiff_converter import main as convert_tiff
-from .png_converter import main as convert_png
+from .nd2_converter import convert_nd2_to_tiff
+from .png_converter import convert_tiff_to_png
 
-__all__ = ['convert_tiff', 'convert_png']
-
-# Usage - when importing the above methods into another file use:
-# from scr.image_converters import convert_tiff, convert_png
+__all__ = ["convert_nd2_to_tiff", "convert_tiff_to_png"]
