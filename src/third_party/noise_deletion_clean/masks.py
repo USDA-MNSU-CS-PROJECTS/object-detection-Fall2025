@@ -35,10 +35,12 @@ def build_ring_roi(
     height: int,
     width: int,
     polygons_by_class: dict[int, list[list[tuple[float, float]]]],
+    epidermis_class_id: int = 1,
+    casparian_class_id: int = 0,
 ) -> np.ndarray:
-    """Ring: inside epidermis (class 1), outside Casparian (class 0)."""
-    epi_polys = polygons_by_class.get(1, [])
-    casp_polys = polygons_by_class.get(0, [])
+    """Ring: inside epidermis, outside Casparian (class ids configurable)."""
+    epi_polys = polygons_by_class.get(epidermis_class_id, [])
+    casp_polys = polygons_by_class.get(casparian_class_id, [])
     epi = np.zeros((height, width), dtype=np.uint8)
     casp = np.zeros((height, width), dtype=np.uint8)
     pil_epi = Image.fromarray(epi)
@@ -62,9 +64,10 @@ def build_casp_inside_mask(
     height: int,
     width: int,
     polygons_by_class: dict[int, list[list[tuple[float, float]]]],
+    casparian_class_id: int = 0,
 ) -> np.ndarray:
-    """ROI = filled Casparian polygons (class 0)."""
-    casp_polys = polygons_by_class.get(0, [])
+    """ROI = filled Casparian polygons (class id configurable)."""
+    casp_polys = polygons_by_class.get(casparian_class_id, [])
     casp = np.zeros((height, width), dtype=np.uint8)
     pil_casp = Image.fromarray(casp)
     dc = ImageDraw.Draw(pil_casp)
