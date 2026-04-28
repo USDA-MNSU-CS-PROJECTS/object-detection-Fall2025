@@ -9,6 +9,13 @@ This downloader automates the process of acquiring and preparing image data from
 >
 > **For future use cases**, you will likely need to modify `downloader.py` to adjust these filters and target folders.
 
+> [!IMPORTANT]
+> `run_downloader.py` is not cross-platform in its current form. It calls Conda using a hardcoded macOS path:
+> `/opt/anaconda3/bin/conda`.
+> If you are on Windows/Linux, either:
+> - run `downloader.py` directly in your active environment, or
+> - update `run_downloader.py` to use your local Conda/Python path.
+
 ## How it Works
 
 1.  **Authentication**: Uses Box API credentials (Client ID, Client Secret, and Refresh Token) stored in a `.env` file to authenticate and access the specified Box folder.
@@ -24,4 +31,11 @@ This downloader automates the process of acquiring and preparing image data from
 
 ## Usage
 
-To run the downloader, execute `run_downloader.py` from the `src` directory. Ensure your Box API credentials are up-to-date in the `.env` file. If the refresh token expires, use `refresh_token.py` to obtain a new one.
+To run the downloader:
+
+1. Ensure Box API credentials are present in `src/data_downloader/.env`.
+2. Preferred (portable) path: run `downloader.py` directly in the prepared environment.
+3. Optional launcher path: run `run_downloader.py` only after adapting its hardcoded Conda path to your machine.
+4. If the refresh token expires, use `refresh_token.py` to obtain a new token.
+
+This utility is considered legacy tooling and is not part of the main Gradio runtime path (`src/app/main.py`).

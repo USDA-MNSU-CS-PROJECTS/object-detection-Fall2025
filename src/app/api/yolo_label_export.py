@@ -10,6 +10,8 @@ _third = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "th
 if _third not in sys.path:
     sys.path.insert(0, _third)
 
+from config.inference_constants import YOLO_CLASS_CASPARIAN, YOLO_CLASS_EPIDERMIS
+
 
 def result_to_polygons_by_class(
     result: Any,
@@ -57,8 +59,8 @@ def write_merged_label_with_noise(
 
     noise_polys = mask_to_normalized_polygons(noise_mask, height, width)
     merged = {
-        0: list(polygons_by_class.get(0, [])),
-        1: list(polygons_by_class.get(1, [])),
+        YOLO_CLASS_CASPARIAN: list(polygons_by_class.get(YOLO_CLASS_CASPARIAN, [])),
+        YOLO_CLASS_EPIDERMIS: list(polygons_by_class.get(YOLO_CLASS_EPIDERMIS, [])),
         2: noise_polys,
     }
     write_yolo_seg_label_txt(path, merged)

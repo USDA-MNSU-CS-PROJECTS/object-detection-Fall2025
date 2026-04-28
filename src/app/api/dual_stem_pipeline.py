@@ -329,7 +329,11 @@ class DualStemPipelineProcessor:
                 records.append(build_na_row(img_name, "No Casparian mask"))
                 continue
             if YOLO_CLASS_EPIDERMIS not in polys_by_class or not polys_by_class.get(YOLO_CLASS_EPIDERMIS):
-                _post_logger.warning("No Epidermis polygons in %s (ring ROI needs class 1)", img_name)
+                _post_logger.warning(
+                    "No Epidermis polygons in %s (ring ROI needs class %s)",
+                    img_name,
+                    YOLO_CLASS_EPIDERMIS,
+                )
                 records.append(build_na_row(img_name, "No Epidermis mask"))
                 continue
 
@@ -380,8 +384,19 @@ class DualStemPipelineProcessor:
             rgb = np.array(Image.open(img_path).convert("RGB"))
             pr_ring = app_params_for_stage(img_name, "ring", DEFAULT_STAGE)
             pr_casp = app_params_for_stage(img_name, "casp", DEFAULT_STAGE)
-            roi_ring = build_ring_roi(h, w, polys_by_class)
-            roi_casp = build_casp_inside_mask(h, w, polys_by_class)
+            roi_ring = build_ring_roi(
+                h,
+                w,
+                polys_by_class,
+                epidermis_class_id=YOLO_CLASS_EPIDERMIS,
+                casparian_class_id=YOLO_CLASS_CASPARIAN,
+            )
+            roi_casp = build_casp_inside_mask(
+                h,
+                w,
+                polys_by_class,
+                casparian_class_id=YOLO_CLASS_CASPARIAN,
+            )
             noise_ring = detect_noise_mask(rgb, roi_ring, pr_ring)
             noise_casp = detect_noise_mask(rgb, roi_casp, pr_casp)
             # Bitwise OR merges ring + casp noise for class-2 YOLO labels and area metrics.

@@ -24,8 +24,8 @@ The repository includes scripts for data downloading, model training, the main G
 ├── debug_output/               # Optional debug logs/JSON from runs (gitignored)
 ├── model_training/             # Scripts and configuration for model training
 │   ├── data.yaml               # Dataset configuration for YOLO
-│   ├── run.sh                  # SLURM script for HPC training
-│   └── train_yolov8_seg.py     # Main training script
+│   ├── train_yolov8_seg.py     # Main training script
+│   └── model_training_readme.md
 ├── sample_trained_models/      # Pre-trained weights (add locally; see Configuration)
 ├── src/
 │   ├── app/                    # Gradio application
@@ -37,6 +37,7 @@ The repository includes scripts for data downloading, model training, the main G
 │   │       ├── dual_stem_pipeline.py  # Default dual-model post-process + viz
 │   │       ├── stem_metrics.py
 │   │       ├── yolo_label_export.py
+│   │       ├── filename_metadata.py
 │   │       ├── post_processor.py        # Legacy single-model viz (not default UI path)
 │   │       └── test_pipeline.py         # Integration smoke test
 │   ├── third_party/
@@ -86,14 +87,15 @@ This project uses a Conda environment to ensure a consistent development setup.
 
     _Note: The environment name is defined inside the `environment.yml` file._
 
-3.  **Create Data Directories:**
-    Run the setup script to create the necessary directory structure for data storage and testing:
+3.  **(Optional, legacy) Create Data Directories:**
+    Run the setup script only if you intentionally use legacy/manual converter tests:
 
     ```bash
     python setup_directories.py
     ```
 
-    This script creates directories for input images, output images, and test data used during development and testing. The directories are hardcoded in the test scripts.
+    The main Gradio workflow (`src/app/main.py`) uses temporary runtime folders and does **not** require this step.  
+    `setup_directories.py` is kept for older/manual local workflows (`converter_test_data`, legacy data layout).
 
 4.  **Verify the Setup:**
     If Anaconda was just installed, you can verify the installation by running `conda --version`.
@@ -157,17 +159,17 @@ To create a portable package that end users can run without installing Python:
 
 ### 5. Data Downloader
 
-The `src/data_downloader` contains scripts to automate downloading and preparing data from Box. This was a one time use code that uses box developer console and API keys to download the data from Box. [Get more information](src/data_downloader/downloader_documentation.md)
+The `src/data_downloader` folder contains a one-time legacy utility for downloading and preparing data from Box. It was written for a specific historical ingest path and uses hardcoded assumptions. [Get more information](src/data_downloader/downloader_documentation.md)
 
 - **Configuration:** Add your Box API credentials to a `.env` file in the `src/data_downloader` directory.
-- **Usage:** Run `run_downloader.py` to start the process.
+- **Usage note:** `run_downloader.py` currently calls Conda using a hardcoded macOS path (`/opt/anaconda3/bin/conda`). On Windows/Linux, run `downloader.py` manually in your environment or update the launcher script first.
 
 ### 6. Model Training
 
 The `model_training` directory contains the necessary files to train the YOLOv8 segmentation model.
 
 - **Dataset:** The training script expects a `data.yaml` file that defines the dataset paths and classes, following the YOLO format.
-- **Training:** The `train_yolov8_seg.py` script, orchestrated by `run.sh` in an HPC(High Performance Computer) environment, loads a base YOLOv8 model and trains it on the custom dataset. You can adapt `run.sh` for your local environment or run the python script directly.
+- **Training:** Run `train_yolov8_seg.py` from the `model_training` directory (after editing `data.yaml` and script parameters as needed). For SLURM or other schedulers, wrap the same command in your own job script at the cluster. Details: [model_training/model_training_readme.md](model_training/model_training_readme.md).
 
 ## Configuration
 
@@ -187,7 +189,7 @@ The portable package created by `create_portable_package.bat` includes:
 
 - Complete Python 3.9 environment with all dependencies
 - The Gradio application and all backend modules
-- **Note:** The batch script copies `sample_trained_models/best.pt` to `portable_package/models/best.pt` if that file exists. The **current** `src/app/main.py` expects **two** weights under `sample_trained_models/` (`casparian_epidermis.pt` and `vascular_bundles.pt` per `inference_constants.py`). For development runs, use those two files; if you rely on the portable builder, copy or symlink both weights into the portable `models/` folder and align paths with your deployment (the generated launcher still references `models/best.pt` from older single-model flows).
+- **Important compatibility note:** `create_portable_package.bat` is currently a **legacy single-model packager** (`models/best.pt` flow). The current app runtime in `src/app/main.py` is **dual-model** and expects `casparian_epidermis.pt` + `vascular_bundles.pt`. Treat the generated portable package as legacy unless you update launcher/model path logic for dual-model mode.
 - User-friendly launcher (`START_TOOL.bat`)
 - Comprehensive user documentation (`README.txt`)
 
@@ -200,7 +202,10 @@ The portable package created by `create_portable_package.bat` includes:
 
 ### Updating the Model
 
-To update weights in an existing portable package, replace the files under `portable_package/models/` with your new `.pt` files and ensure `main.py` / launcher paths match the filenames you use. If you still use the generated `best.pt` layout from `create_portable_package.bat`, replace `portable_package/models/best.pt`; for the dual-model app, supply both model A and B weights consistently with `inference_constants.py`.
+To update weights in an existing portable package, ensure the launcher and app paths match your packaging mode:
+
+- Legacy packager mode: replace `portable_package/models/best.pt`.
+- Current app dual-model mode: provide both model files and align launcher/app paths with `inference_constants.py` (`casparian_epidermis.pt`, `vascular_bundles.pt`).
 
 ### Performance Notes
 

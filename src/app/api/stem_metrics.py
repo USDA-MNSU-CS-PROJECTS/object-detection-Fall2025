@@ -26,6 +26,8 @@ from config.inference_constants import (
     RING_QUALITY_CLOSURE_ITERATIONS,
     RING_QUALITY_MEDIAL_BRANCH_WARN,
     RING_QUALITY_MIN_MAIN_COMPONENT_AREA_FRACTION,
+    YOLO_CLASS_CASPARIAN,
+    YOLO_CLASS_EPIDERMIS,
 )
 
 from noise_deletion_clean.masks import build_ring_roi, polygons_to_pixel_mask
@@ -263,12 +265,18 @@ def _compute_metric_components(
     np.ndarray,
     np.ndarray,
 ]:
-    ring = build_ring_roi(height, width, polygons_by_class)
+    ring = build_ring_roi(
+        height,
+        width,
+        polygons_by_class,
+        epidermis_class_id=YOLO_CLASS_EPIDERMIS,
+        casparian_class_id=YOLO_CLASS_CASPARIAN,
+    )
     noise_u = np.clip(noise_union.astype(np.uint8), 0, 1)
     noise_b = noise_u.astype(bool)
 
-    epi = polygons_to_pixel_mask(height, width, polygons_by_class.get(1, []))
-    casp = polygons_to_pixel_mask(height, width, polygons_by_class.get(0, []))
+    epi = polygons_to_pixel_mask(height, width, polygons_by_class.get(YOLO_CLASS_EPIDERMIS, []))
+    casp = polygons_to_pixel_mask(height, width, polygons_by_class.get(YOLO_CLASS_CASPARIAN, []))
 
     ring_clean = ring.astype(np.uint8)
     ring_minus_noise = (ring_clean.astype(bool) & ~noise_b).astype(np.uint8)

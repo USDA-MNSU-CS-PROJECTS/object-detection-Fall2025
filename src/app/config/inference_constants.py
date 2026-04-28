@@ -13,19 +13,19 @@ CLASS_CASPARIAN_FALLBACK = "Cross Section"
 
 CLASS_VASCULAR_BUNDLES = "Vascular Bundles"
 
-YOLO_CLASS_CASPARIAN = 0
-YOLO_CLASS_EPIDERMIS = 1
+YOLO_CLASS_CASPARIAN = 1
+YOLO_CLASS_EPIDERMIS = 0
 
 # If True: model A labels are inverted vs biology (outer contour named "Casparian Strip",
 # inner ring named "Epidermis"). We map to bucket 0=casparian 1=epidermis for metrics/ROI.
-MODEL_A_SWAP_EPI_CASP_LABELS = False
+MODEL_A_SWAP_EPI_CASP_LABELS = True
 
 # If True: when multiple epidermis masks exist, keep only the one whose centroid is nearest
 # image center (drops stray fragments e.g. in corners). Tie-break: larger polygon area.
 MODEL_A_EPIDERMIS_KEEP_NEAREST_TO_CENTER = True
 
-DEFAULT_CONF_MODEL_A = 0.5
-DEFAULT_CONF_MODEL_B = 0.8
+DEFAULT_CONF_MODEL_A = 0.8
+DEFAULT_CONF_MODEL_B = 0.5
 
 PIXEL_TO_MICRON = 0.9785316641067333
 
@@ -47,4 +47,5 @@ RING_QUALITY_MEDIAL_BRANCH_WARN = 40
 # Before medial axis: binary_opening iterations on ring (0 = off). Reduces boundary spurs.
 RING_MASK_OPEN_BEFORE_MEDIAL_ITERATIONS = 3
 # After medial_axis: remove 8-connected leaf pixels up to this many passes (spur pruning).
-RING_MEDIAL_SPUR_PRUNE_MAX_ITER = 2048
+RING_MEDIAL_SPUR_PRUNE_MAX_ITER = 24
+
