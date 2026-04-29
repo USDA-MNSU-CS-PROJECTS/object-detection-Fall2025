@@ -227,16 +227,37 @@ def run_full_pipeline(files, progress=gr.Progress()):
         debug_output_dir = os.path.join(project_root, "debug_output")
         os.makedirs(debug_output_dir, exist_ok=True)
 
-        models_dir = os.path.join(project_root, "sample_trained_models")
-        path_a = os.path.join(models_dir, MODEL_A_CASPARIAN_EPIDERMIS)
-        path_b = os.path.join(models_dir, MODEL_B_VASCULAR_BUNDLES)
-        missing = [p for p in (path_a, path_b) if not os.path.isfile(p)]
-        if missing:
+        candidate_model_dirs = [
+            os.path.join(project_root, "models"),
+            os.path.join(project_root, "sample_trained_models"),
+            os.path.join(os.path.dirname(script_dir), "models"),
+            os.path.join(os.path.dirname(script_dir), "sample_trained_models"),
+        ]
+
+        models_dir = None
+
+        for candidate in candidate_model_dirs:
+            path_a = os.path.join(candidate, MODEL_A_CASPARIAN_EPIDERMIS)
+            path_b = os.path.join(candidate, MODEL_B_VASCULAR_BUNDLES)
+            if os.path.isfile(path_a) and os.path.isfile(path_b):
+                models_dir = candidate
+                break
+
+        if models_dir is None:
+            searched = "\n".join(candidate_model_dirs)
             msg = (
-                "Missing model weights. Place these files under sample_trained_models/:\n"
-                + "\n".join(missing)
+                "Missing model weights. Looked in these folders:\n"
+                + searched
+                + "\n\nExpected files:\n"
+                + MODEL_A_CASPARIAN_EPIDERMIS
+                + "\n"
+                + MODEL_B_VASCULAR_BUNDLES
             )
             return None, None, msg, None, temp_dir
+
+        print(f"Using models from: {models_dir}")
+        print(f"Model A: {path_a}")
+        print(f"Model B: {path_b}")
 
         n_img = len(all_pngs_for_processing)
         predictor_a = ModelPredictor(path_a)
@@ -339,7 +360,7 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
         with gr.TabItem("Full Detection Pipeline"):
             with gr.Row():
                 with gr.Column(scale=2):
-                    analysis_files = gr.File(label="Upload ND2, PNG, or ZIP files", file_count="multiple", file_types=[".nd2", ".png", ".zip"])
+                    analysis_files = gr.File(label="Upload ND2, PNG, or ZIP files with RR or PG in the filename", file_count="multiple", file_types=[".nd2", ".png", ".zip"])
                     analysis_btn = gr.Button("Run Analysis", variant="primary")
                 
                 with gr.Column(scale=3):
