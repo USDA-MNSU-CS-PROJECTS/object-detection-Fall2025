@@ -12,7 +12,7 @@ The repository includes scripts for data downloading, model training, the main G
 - **Dual Pipelines:**
   - **Full Analysis Pipeline:** Converts images, runs model A (Casparian + Epidermis) and model B (vascular bundles), applies noise handling in ROIs, computes geometry in microns, and generates CSV reports and overlay PNGs.
   - **Simple Image Converter:** A utility to convert `.nd2` microscopy files to `.png` format.
-- **Flexible File Handling:** Accepts `.nd2`, `.png`, and `.zip` files.
+- **Flexible File Handling:** Accepts `.nd2`, `.png`, `.jpg`, `.jpeg`, and `.zip` files.
 - **Modular and Extensible:** The code is structured with a clear separation of concerns, making it easy to modify or extend.
 - **Reproducible Training:** Includes scripts and configuration for training the YOLOv8 model on a custom dataset.
 - **Portable Distribution:** Build a standalone package that end users can run without installing Python or any dependencies.
@@ -118,6 +118,16 @@ To run the application locally for development or testing purposes:
     python main.py
     ```
 4.  Open your web browser and go to the local URL provided by Gradio (usually `http://127.0.0.1:7860`).
+
+### Supported upload formats
+
+- `.nd2`
+- `.png`
+- `.jpg`
+- `.jpeg`
+- `.zip`
+
+**Note:** JPEG is supported, but JPEG compression is lossy. If exact pixel-level analysis matters, prefer PNG when possible.
 
 #### For End User Distribution
 

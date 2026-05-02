@@ -8,7 +8,8 @@ This document provides an overview of the core Python code that powers the Alfal
     -   `run_conversion(files)`: Handles the "Simple Image Converter" pipeline, converting ND2 files to PNG and zipping them for download.
     -   `run_full_pipeline(files, progress=gr.Progress())`: Converts inputs, runs **two** YOLO models (`sample_trained_models/casparian_epidermis.pt` and `vascular_bundles.pt`), runs noise stages (ring + casp), builds extended CSV, zips visualizations, generated labels, and merged geometry.
 -   **Model configuration:** `src/app/config/inference_constants.py` (paths, class names, confidences). Noise PG/RR profiles: `src/app/config/noise_profiles_app.py`.
--   **File Handling:** Accepts `.nd2`, `.png`, and `.zip` files. For `.zip` files, it extracts only `.nd2` and `.png` files, ignoring others and macOS metadata files (e.g., `._*`).
+-   **File Handling:** Accepts `.nd2`, `.png`, `.jpg`, `.jpeg`, and `.zip` files. For `.zip` files, it extracts only `.nd2`, `.png`, `.jpg`, and `.jpeg` files, ignoring others and macOS metadata files (e.g., `._*`).
+-   **JPEG note:** JPEG is supported, but JPEG compression is lossy. If exact pixel-level analysis matters, prefer PNG.
 
 ## `src/app/api/converter.py`
 -   **Purpose:** Responsible for converting ND2 microscopy image files into PNG format directly without conversion to TIFF.

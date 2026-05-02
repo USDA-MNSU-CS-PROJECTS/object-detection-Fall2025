@@ -134,10 +134,10 @@ def run_conversion(files, progress=gr.Progress()):
                         if member.is_dir() or sanitized_name.startswith('._') or sanitized_name.startswith('.'):
                             continue
 
-                        if sanitized_name.lower().endswith(('.nd2', '.png')):
+                        if sanitized_name.lower().endswith(('.nd2', '.png', '.jpg', '.jpeg')):
                             with zip_ref.open(member) as source, open(os.path.join(input_dir, sanitized_name), 'wb') as target:
                                 shutil.copyfileobj(source, target)
-            elif file_path.lower().endswith(('.nd2', '.png')):
+            elif file_path.lower().endswith(('.nd2', '.png', '.jpg', '.jpeg')):
                 shutil.copy(file_path, os.path.join(input_dir, os.path.basename(file_path)))
             
         progress(0.3, desc="Converting images...")
@@ -146,9 +146,9 @@ def run_conversion(files, progress=gr.Progress()):
         png_files = converter.process_directory(input_dir, converted_dir)
         
         # The converted files are in converted_dir, so we zip that directory's contents
-        # Also include any PNGs that were uploaded directly
+        # Also include any directly uploaded raster images (PNG/JPG/JPEG)
         for f in os.listdir(input_dir):
-            if f.lower().endswith('.png'):
+            if f.lower().endswith(('.png', '.jpg', '.jpeg')):
                 shutil.copy(os.path.join(input_dir, f), converted_dir)
 
         progress(0.8, desc="Creating output archive...")
@@ -200,10 +200,10 @@ def run_full_pipeline(files, progress=gr.Progress()):
                         if member.is_dir() or sanitized_name.startswith('._') or sanitized_name.startswith('.'):
                             continue
 
-                        if sanitized_name.lower().endswith(('.nd2', '.png')):
+                        if sanitized_name.lower().endswith(('.nd2', '.png', '.jpg', '.jpeg')):
                             with zip_ref.open(member) as source, open(os.path.join(input_dir, sanitized_name), 'wb') as target:
                                 shutil.copyfileobj(source, target)
-            elif file_path.lower().endswith(('.nd2', '.png')):
+            elif file_path.lower().endswith(('.nd2', '.png', '.jpg', '.jpeg')):
                 shutil.copy(file_path, os.path.join(input_dir, os.path.basename(file_path)))
         
         # Convert ND2 files
@@ -211,17 +211,21 @@ def run_full_pipeline(files, progress=gr.Progress()):
         converter = ImageConverter()
         converted_pngs = converter.process_directory(input_dir, converted_dir)
         
-        # Also include any direct PNG uploads
-        direct_pngs = [os.path.join(input_dir, f) for f in os.listdir(input_dir) if f.lower().endswith('.png')]
+        # Also include any direct PNG/JPG/JPEG uploads
+        direct_raster_images = [
+            os.path.join(input_dir, f)
+            for f in os.listdir(input_dir)
+            if f.lower().endswith(('.png', '.jpg', '.jpeg'))
+        ]
         
-        # All PNGs for processing are in converted_dir or input_dir
-        all_pngs_for_processing = converted_pngs + direct_pngs
+        # All raster images for processing are in converted_dir or input_dir
+        all_images_for_processing = converted_pngs + direct_raster_images
 
-        if not all_pngs_for_processing:
+        if not all_images_for_processing:
             return None, None, "No images to process", None, temp_dir
         
         # Run predictions
-        progress(0.4, desc=f"Running detection on {len(all_pngs_for_processing)} images...")
+        progress(0.4, desc=f"Running detection on {len(all_images_for_processing)} images...")
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(os.path.dirname(script_dir))
         debug_output_dir = os.path.join(project_root, "debug_output")
@@ -259,7 +263,7 @@ def run_full_pipeline(files, progress=gr.Progress()):
         print(f"Model A: {path_a}")
         print(f"Model B: {path_b}")
 
-        n_img = len(all_pngs_for_processing)
+        n_img = len(all_images_for_processing)
         predictor_a = ModelPredictor(path_a)
         predictor_b = ModelPredictor(path_b)
         processor = DualStemPipelineProcessor(output_dir, debug_log_dir=debug_output_dir)
@@ -269,7 +273,7 @@ def run_full_pipeline(files, progress=gr.Progress()):
         all_records_a: list = []
         all_records_b: list = []
 
-        for idx, path in enumerate(all_pngs_for_processing):
+        for idx, path in enumerate(all_images_for_processing):
             progress(
                 0.35 + 0.35 * (idx / max(n_img, 1)),
                 desc=f"Image {idx + 1}/{n_img}: models + postprocess...",
@@ -304,8 +308,8 @@ def run_full_pipeline(files, progress=gr.Progress()):
         output_zip_path = os.path.join(output_dir, "output_images.zip")
         with zipfile.ZipFile(output_zip_path, 'w') as zipf:
             # Add converted images
-            for png_file in all_pngs_for_processing:
-                zipf.write(png_file, os.path.join('input_images', os.path.basename(png_file)))
+            for input_image in all_images_for_processing:
+                zipf.write(input_image, os.path.join('input_images', os.path.basename(input_image)))
             # Add post-processor visualizations
             for viz_file in viz_files:
                 zipf.write(viz_file, os.path.join('visualizations', os.path.basename(viz_file)))
@@ -340,7 +344,7 @@ def run_full_pipeline(files, progress=gr.Progress()):
                 if os.path.isfile(raw_json):
                     zipf.write(raw_json, os.path.join("debug", pat))
 
-        status = f"Processed {len(all_pngs_for_processing)} images.\n"
+        status = f"Processed {len(all_images_for_processing)} images.\n"
         if not df.empty:
             status += f"Found {len(df)} detections.\n"
         
@@ -360,7 +364,7 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
         with gr.TabItem("Full Detection Pipeline"):
             with gr.Row():
                 with gr.Column(scale=2):
-                    analysis_files = gr.File(label="Upload ND2, PNG, or ZIP files with RR or PG in the filename", file_count="multiple", file_types=[".nd2", ".png", ".zip"])
+                    analysis_files = gr.File(label="Upload ND2, PNG/JPG, or ZIP files with RR or PG in the filename", file_count="multiple", file_types=[".nd2", ".png", ".jpg", ".jpeg", ".zip"])
                     analysis_btn = gr.Button("Run Analysis", variant="primary")
                 
                 with gr.Column(scale=3):
@@ -380,7 +384,7 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
         with gr.TabItem("Simple Image Converter"):
             with gr.Row():
                 with gr.Column(scale=2):
-                    convert_files = gr.File(label="Upload ND2, PNG, or ZIP files", file_count="multiple", file_types=[".nd2", ".png", ".zip"])
+                    convert_files = gr.File(label="Upload ND2, PNG/JPG, or ZIP files", file_count="multiple", file_types=[".nd2", ".png", ".jpg", ".jpeg", ".zip"])
                     convert_btn = gr.Button("Convert", variant="primary")
                 with gr.Column(scale=3):
                     convert_status = gr.Textbox(label="Status", lines=3)
@@ -423,4 +427,5 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
 
 if __name__ == "__main__":
     app.queue() # For progress tracking
-    app.launch(inbrowser=True)
+    _port = int(os.environ.get("GRADIO_SERVER_PORT", "7860"))
+    app.launch(inbrowser=True, server_port=_port)
