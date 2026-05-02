@@ -35,6 +35,7 @@ mkdir portable_package\third_party\noise_deletion_clean
 echo.
 echo Step 4: Copying application files...
 copy src\app\main.py portable_package\app\
+copy src\app\app.py portable_package\app\
 copy src\app\api\*.py portable_package\app\api\
 copy src\app\config\*.py portable_package\app\config\
 copy src\third_party\noise_deletion_clean\*.py portable_package\third_party\noise_deletion_clean\
@@ -104,7 +105,7 @@ echo     exit /b 1
 echo ^)
 echo.
 echo REM Start the application
-echo python_env\python.exe app\main.py
+echo python_env\python.exe app\app.py
 echo.
 echo if errorlevel 1 ^(
 echo     echo.

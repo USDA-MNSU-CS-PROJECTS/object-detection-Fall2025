@@ -1,9 +1,12 @@
 # Application Code Overview
 
-This document provides an overview of the core Python code that powers the Alfalfa Stem Object Detection Gradio application. The application is structured into a main Gradio interface (`main.py`) and API modules (`converter.py`, `predictor.py`, `dual_stem_pipeline.py`, `stem_metrics.py`, `yolo_label_export.py`, `filename_metadata.py`, `post_processor.py` legacy).
+This document provides an overview of the core Python code that powers the Alfalfa Stem Object Detection Gradio application. The UI runtime is **`app.py`** (CLI entry point, recommended for integrations). **`main.py`** holds the implementation: Gradio Blocks, upload handling, and pipeline orchestration, plus modules under `api/`.
+
+## `src/app/app.py`
+-   **Purpose:** Canonical way to launch the UI. Parses `--port` (default: `GRADIO_SERVER_PORT` or `7860`) and optional `--no-browser`, then queues and launches Gradio.
 
 ## `src/app/main.py`
--   **Purpose:** Serves as the main entry point for the Gradio application. It defines the user interface, handles file uploads, orchestrates the processing pipeline, and displays results.
+-   **Purpose:** Defines Gradio Blocks, hooks, handlers, pipeline helpers, and shared constants for predictable per-run/`output_images.zip` layout.
 -   **Key Functions:**
     -   `run_conversion(files)`: Handles the "Simple Image Converter" pipeline, converting ND2 files to PNG and zipping them for download.
     -   `run_full_pipeline(files, progress=gr.Progress())`: Converts inputs, runs **two** YOLO models (`sample_trained_models/casparian_epidermis.pt` and `vascular_bundles.pt`), runs noise stages (ring + casp), builds extended CSV, zips visualizations, generated labels, and merged geometry.

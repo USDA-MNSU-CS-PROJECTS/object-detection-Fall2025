@@ -6,7 +6,7 @@ These files train a YOLOv8 instance-segmentation model (historically used on a J
 
 > [!IMPORTANT]
 > This training folder primarily documents a **legacy single-model training path** (`Cross Section` + `Vascular Bundles`).
-> The current production Gradio runtime is **dual-model** (`src/app/main.py`):
+> The current production Gradio runtime is **dual-model** (`src/app/main.py`, launched via `python app.py` from `src/app/`):
 > - model A: Casparian Strip + Epidermis
 > - model B: Vascular Bundles
 >

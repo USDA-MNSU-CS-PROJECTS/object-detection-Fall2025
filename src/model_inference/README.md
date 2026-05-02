@@ -4,7 +4,7 @@ This directory contains scripts for running inference using trained YOLOv8 model
 
 > [!NOTE]
 > This is a standalone/manual inference helper path. It is not the main production flow of the project.
-> The main app runtime is the Gradio pipeline in `src/app/main.py`.
+> The main app runtime is the Gradio pipeline in `src/app/main.py`; run it via `python app.py` from `src/app/`.
 
 ## Files
 

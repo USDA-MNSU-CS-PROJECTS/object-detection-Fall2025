@@ -1,8 +1,11 @@
 import os
 import sys
 import shutil
+import tempfile
 import unittest
 from unittest.mock import MagicMock
+
+from PIL import Image
 
 _app = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 _third = os.path.abspath(os.path.join(_app, "..", "third_party"))
@@ -64,6 +67,40 @@ class TestPipeline(unittest.TestCase):
             if temp_dir and os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
                 print(f"Cleaned up temporary directory: {temp_dir}")
+
+    def test_full_pipeline_jpeg(self):
+        """Smoke test raster path using a synthetic JPEG."""
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        path_a = os.path.join(project_root, "sample_trained_models", MODEL_A_CASPARIAN_EPIDERMIS)
+        path_b = os.path.join(project_root, "sample_trained_models", MODEL_B_VASCULAR_BUNDLES)
+        if not (os.path.isfile(path_a) and os.path.isfile(path_b)):
+            self.skipTest(
+                f"Skipping JPEG pipeline test: place YOLO weights as {MODEL_A_CASPARIAN_EPIDERMIS} and "
+                f"{MODEL_B_VASCULAR_BUNDLES} in sample_trained_models/"
+            )
+
+        td = tempfile.mkdtemp(suffix="_jpeg_pipe")
+        jpeg_path = os.path.join(td, "20230205a_T4_10xstitch_RR.jpg")
+        try:
+            img = Image.new("RGB", (64, 64), color=(40, 80, 120))
+            img.save(jpeg_path, format="JPEG", quality=92)
+
+            mock_file = MagicMock()
+            mock_file.name = jpeg_path
+
+            csv_path, zip_path, status, df, temp_dir = run_full_pipeline(files=[mock_file])
+
+            try:
+                self.assertIsNotNone(temp_dir)
+                self.assertIsNotNone(zip_path)
+                self.assertTrue(os.path.isfile(zip_path))
+                self.assertNotIn("Error", status)
+            finally:
+                if temp_dir and os.path.isdir(temp_dir):
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
 
 if __name__ == "__main__":
     # This allows the test to be run directly

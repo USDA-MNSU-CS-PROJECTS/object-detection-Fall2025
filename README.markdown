@@ -29,7 +29,8 @@ The repository includes scripts for data downloading, model training, the main G
 ├── sample_trained_models/      # Pre-trained weights (add locally; see Configuration)
 ├── src/
 │   ├── app/                    # Gradio application
-│   │   ├── main.py             # Entry point
+│   │   ├── app.py              # Run the UI (recommended entry point)
+│   │   ├── main.py             # UI + pipeline implementation
 │   │   ├── config/             # inference_constants, noise_profiles_app
 │   │   └── api/
 │   │       ├── converter.py
@@ -94,7 +95,7 @@ This project uses a Conda environment to ensure a consistent development setup.
     python setup_directories.py
     ```
 
-    The main Gradio workflow (`src/app/main.py`) uses temporary runtime folders and does **not** require this step.  
+    The main Gradio workflow (`src/app/main.py` plus `src/app/app.py`) uses temporary runtime folders and does **not** require this step.  
     `setup_directories.py` is kept for older/manual local workflows (`converter_test_data`, legacy data layout).
 
 4.  **Verify the Setup:**
@@ -115,9 +116,11 @@ To run the application locally for development or testing purposes:
     ```
 3.  **Run the app:**
     ```bash
-    python main.py
+    python app.py
     ```
-4.  Open your web browser and go to the local URL provided by Gradio (usually `http://127.0.0.1:7860`).
+4.  Open your web browser at the URL printed by Gradio (default base port is **7860**).
+
+Optional: set a port with `--port` or the `GRADIO_SERVER_PORT` environment variable (same meaning as `--port`).
 
 ### Supported upload formats
 
@@ -127,7 +130,18 @@ To run the application locally for development or testing purposes:
 - `.jpeg`
 - `.zip`
 
-**Note:** JPEG is supported, but JPEG compression is lossy. If exact pixel-level analysis matters, prefer PNG when possible.
+JPEG is supported, but PNG is preferred when you need tighter control over pixels, because JPEG uses lossy compression.
+
+### Exported results layout (reference)
+
+Each analysis run builds a workspace under a temporary folder: `input/`, `converted/`, `output/`. When you download `output_images.zip`, paths follow this structure:
+
+- `input_images/` — copies of raster inputs passed to inference (basename preserved)
+- `visualizations/` — overlay images (when enabled by configuration)
+- `labels_generated/` — YOLO-style label text files
+- `geometry_export/` — merged geometry text files
+- `metric_debug_viz/` — optional per-metric debug PNGs when enabled in settings
+- `debug/` — log and raw prediction JSON summaries (copied from project `debug_output/` when present)
 
 #### For End User Distribution
 

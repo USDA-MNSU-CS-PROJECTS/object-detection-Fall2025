@@ -28,6 +28,24 @@ from converter import ImageConverter
 from predictor import ModelPredictor
 from dual_stem_pipeline import DualStemPipelineProcessor
 
+# Per-run temp workspace: <temp>/input, converted, output
+RUN_DIR_INPUT = "input"
+RUN_DIR_CONVERTED = "converted"
+RUN_DIR_OUTPUT = "output"
+# output_images.zip top-level folders (stable for integrations)
+ZIP_DIR_INPUT_IMAGES = "input_images"
+ZIP_DIR_VISUALIZATIONS = "visualizations"
+ZIP_DIR_LABELS = "labels_generated"
+ZIP_DIR_GEOMETRY = "geometry_export"
+ZIP_DIR_METRIC_DEBUG = "metric_debug_viz"
+ZIP_DIR_DEBUG = "debug"
+OUTPUT_CSV_NAME = "results.csv"
+OUTPUT_BUNDLE_ZIP_NAME = "output_images.zip"
+CONVERTED_BUNDLE_ZIP_NAME = "converted_images.zip"
+
+RASTER_EXTENSIONS = (".png", ".jpg", ".jpeg")
+GRADIO_FILE_TYPES = [".nd2", ".png", ".jpg", ".jpeg", ".zip"]
+
 # Legacy single-model pipeline was removed from run_full_pipeline; see git history / post_processor.py.
 # DEFAULT_MODEL_FILENAME = "best_v2.pt"
 # DEFAULT_CONF_THRESHOLD = 0.80
@@ -116,8 +134,8 @@ def run_conversion(files, progress=gr.Progress()):
     
     progress(0, desc="Setting up...")
     temp_dir = tempfile.mkdtemp()
-    input_dir = os.path.join(temp_dir, "input")
-    converted_dir = os.path.join(temp_dir, "converted")
+    input_dir = os.path.join(temp_dir, RUN_DIR_INPUT)
+    converted_dir = os.path.join(temp_dir, RUN_DIR_CONVERTED)
     os.makedirs(input_dir, exist_ok=True)
     os.makedirs(converted_dir, exist_ok=True)
     
@@ -134,10 +152,10 @@ def run_conversion(files, progress=gr.Progress()):
                         if member.is_dir() or sanitized_name.startswith('._') or sanitized_name.startswith('.'):
                             continue
 
-                        if sanitized_name.lower().endswith(('.nd2', '.png', '.jpg', '.jpeg')):
+                        if sanitized_name.lower().endswith(('.nd2',) + RASTER_EXTENSIONS):
                             with zip_ref.open(member) as source, open(os.path.join(input_dir, sanitized_name), 'wb') as target:
                                 shutil.copyfileobj(source, target)
-            elif file_path.lower().endswith(('.nd2', '.png', '.jpg', '.jpeg')):
+            elif file_path.lower().endswith(('.nd2',) + RASTER_EXTENSIONS):
                 shutil.copy(file_path, os.path.join(input_dir, os.path.basename(file_path)))
             
         progress(0.3, desc="Converting images...")
@@ -148,13 +166,13 @@ def run_conversion(files, progress=gr.Progress()):
         # The converted files are in converted_dir, so we zip that directory's contents
         # Also include any directly uploaded raster images (PNG/JPG/JPEG)
         for f in os.listdir(input_dir):
-            if f.lower().endswith(('.png', '.jpg', '.jpeg')):
+            if f.lower().endswith(RASTER_EXTENSIONS):
                 shutil.copy(os.path.join(input_dir, f), converted_dir)
 
         progress(0.8, desc="Creating output archive...")
 
         # Zip the contents of the converted_dir
-        output_zip_path = os.path.join(temp_dir, "converted_images.zip")
+        output_zip_path = os.path.join(temp_dir, CONVERTED_BUNDLE_ZIP_NAME)
         with zipfile.ZipFile(output_zip_path, 'w') as zipf:
             for root, _, file_list in os.walk(converted_dir):
                 for file in file_list:
@@ -182,11 +200,12 @@ def run_full_pipeline(files, progress=gr.Progress()):
         # Setup temp directories
         progress(0, desc="Setting up directories...")
         temp_dir = tempfile.mkdtemp()
-        input_dir = os.path.join(temp_dir, "input")
-        converted_dir = os.path.join(temp_dir, "converted")
-        output_dir = os.path.join(temp_dir, "output")
+        input_dir = os.path.join(temp_dir, RUN_DIR_INPUT)
+        converted_dir = os.path.join(temp_dir, RUN_DIR_CONVERTED)
+        output_dir = os.path.join(temp_dir, RUN_DIR_OUTPUT)
         os.makedirs(input_dir, exist_ok=True)
         os.makedirs(converted_dir, exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True)
 
         # Process uploaded files, extracting zip files
         progress(0.1, desc="Processing uploaded files...")
@@ -200,10 +219,10 @@ def run_full_pipeline(files, progress=gr.Progress()):
                         if member.is_dir() or sanitized_name.startswith('._') or sanitized_name.startswith('.'):
                             continue
 
-                        if sanitized_name.lower().endswith(('.nd2', '.png', '.jpg', '.jpeg')):
+                        if sanitized_name.lower().endswith(('.nd2',) + RASTER_EXTENSIONS):
                             with zip_ref.open(member) as source, open(os.path.join(input_dir, sanitized_name), 'wb') as target:
                                 shutil.copyfileobj(source, target)
-            elif file_path.lower().endswith(('.nd2', '.png', '.jpg', '.jpeg')):
+            elif file_path.lower().endswith(('.nd2',) + RASTER_EXTENSIONS):
                 shutil.copy(file_path, os.path.join(input_dir, os.path.basename(file_path)))
         
         # Convert ND2 files
@@ -215,7 +234,7 @@ def run_full_pipeline(files, progress=gr.Progress()):
         direct_raster_images = [
             os.path.join(input_dir, f)
             for f in os.listdir(input_dir)
-            if f.lower().endswith(('.png', '.jpg', '.jpeg'))
+            if f.lower().endswith(RASTER_EXTENSIONS)
         ]
         
         # All raster images for processing are in converted_dir or input_dir
@@ -300,49 +319,55 @@ def run_full_pipeline(files, progress=gr.Progress()):
         # Save CSV
         csv_path = None
         if not df.empty:
-            csv_path = os.path.join(output_dir, "results.csv")
+            csv_path = os.path.join(output_dir, OUTPUT_CSV_NAME)
             df.to_csv(csv_path, index=False)
         
         # Create a zip file with all the output images and debug files
         progress(0.9, desc="Creating output archive...")
-        output_zip_path = os.path.join(output_dir, "output_images.zip")
+        output_zip_path = os.path.join(output_dir, OUTPUT_BUNDLE_ZIP_NAME)
         with zipfile.ZipFile(output_zip_path, 'w') as zipf:
             # Add converted images
             for input_image in all_images_for_processing:
-                zipf.write(input_image, os.path.join('input_images', os.path.basename(input_image)))
+                zipf.write(
+                    input_image,
+                    os.path.join(ZIP_DIR_INPUT_IMAGES, os.path.basename(input_image)),
+                )
             # Add post-processor visualizations
             for viz_file in viz_files:
-                zipf.write(viz_file, os.path.join('visualizations', os.path.basename(viz_file)))
-            labels_dir = os.path.join(output_dir, "labels_generated")
+                zipf.write(
+                    viz_file,
+                    os.path.join(ZIP_DIR_VISUALIZATIONS, os.path.basename(viz_file)),
+                )
+            labels_dir = os.path.join(output_dir, ZIP_DIR_LABELS)
             if os.path.isdir(labels_dir):
                 for fn in os.listdir(labels_dir):
                     fp = os.path.join(labels_dir, fn)
                     if os.path.isfile(fp):
-                        zipf.write(fp, os.path.join("labels_generated", fn))
-            geom_dir = os.path.join(output_dir, "geometry_export")
+                        zipf.write(fp, os.path.join(ZIP_DIR_LABELS, fn))
+            geom_dir = os.path.join(output_dir, ZIP_DIR_GEOMETRY)
             if os.path.isdir(geom_dir):
                 for fn in os.listdir(geom_dir):
                     fp = os.path.join(geom_dir, fn)
                     if os.path.isfile(fp):
-                        zipf.write(fp, os.path.join("geometry_export", fn))
+                        zipf.write(fp, os.path.join(ZIP_DIR_GEOMETRY, fn))
             # Per-metric debug PNGs (export_metric_debug_visualizations in stem_metrics)
-            metric_debug_dir = os.path.join(output_dir, "metric_debug_viz")
+            metric_debug_dir = os.path.join(output_dir, ZIP_DIR_METRIC_DEBUG)
             if os.path.isdir(metric_debug_dir):
                 for root, _dirs, files in os.walk(metric_debug_dir):
                     for fn in files:
                         fp = os.path.join(root, fn)
                         if os.path.isfile(fp):
                             rel = os.path.relpath(fp, metric_debug_dir)
-                            arcname = os.path.join("metric_debug_viz", rel).replace("\\", "/")
+                            arcname = os.path.join(ZIP_DIR_METRIC_DEBUG, rel).replace("\\", "/")
                             zipf.write(fp, arcname)
             # Add debug files from project folder so they are in the zip too
             log_path = os.path.join(debug_output_dir, "post_processor_debug.log")
             if os.path.isfile(log_path):
-                zipf.write(log_path, "debug/post_processor_debug.log")
+                zipf.write(log_path, f"{ZIP_DIR_DEBUG}/post_processor_debug.log")
             for pat in ("raw_predictions_model_a.json", "raw_predictions_model_b.json"):
                 raw_json = os.path.join(debug_output_dir, pat)
                 if os.path.isfile(raw_json):
-                    zipf.write(raw_json, os.path.join("debug", pat))
+                    zipf.write(raw_json, os.path.join(ZIP_DIR_DEBUG, pat))
 
         status = f"Processed {len(all_images_for_processing)} images.\n"
         if not df.empty:
@@ -364,7 +389,11 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
         with gr.TabItem("Full Detection Pipeline"):
             with gr.Row():
                 with gr.Column(scale=2):
-                    analysis_files = gr.File(label="Upload ND2, PNG/JPG, or ZIP files with RR or PG in the filename", file_count="multiple", file_types=[".nd2", ".png", ".jpg", ".jpeg", ".zip"])
+                    analysis_files = gr.File(
+                        label="Upload ND2, PNG, JPG, or ZIP · RR or PG in filename",
+                        file_count="multiple",
+                        file_types=GRADIO_FILE_TYPES,
+                    )
                     analysis_btn = gr.Button("Run Analysis", variant="primary")
                 
                 with gr.Column(scale=3):
@@ -384,7 +413,11 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
         with gr.TabItem("Simple Image Converter"):
             with gr.Row():
                 with gr.Column(scale=2):
-                    convert_files = gr.File(label="Upload ND2, PNG/JPG, or ZIP files", file_count="multiple", file_types=[".nd2", ".png", ".jpg", ".jpeg", ".zip"])
+                    convert_files = gr.File(
+                        label="Upload ND2, PNG, JPG, or ZIP",
+                        file_count="multiple",
+                        file_types=GRADIO_FILE_TYPES,
+                    )
                     convert_btn = gr.Button("Convert", variant="primary")
                 with gr.Column(scale=3):
                     convert_status = gr.Textbox(label="Status", lines=3)
@@ -425,7 +458,3 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
         outputs=[convert_files, convert_status, convert_zip]
     )
 
-if __name__ == "__main__":
-    app.queue() # For progress tracking
-    _port = int(os.environ.get("GRADIO_SERVER_PORT", "7860"))
-    app.launch(inbrowser=True, server_port=_port)
