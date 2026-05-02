@@ -3,7 +3,7 @@
 This document provides an overview of the core Python code that powers the Alfalfa Stem Object Detection Gradio application. The UI runtime is **`app.py`** (CLI entry point, recommended for integrations). **`main.py`** holds the implementation: Gradio Blocks, upload handling, and pipeline orchestration, plus modules under `api/`.
 
 ## `src/app/app.py`
--   **Purpose:** Canonical way to launch the UI. Parses `--port` (default: `GRADIO_SERVER_PORT` or `7860`) and optional `--no-browser`, then queues and launches Gradio.
+-   **Purpose:** Canonical way to launch the UI. Parses `--port` (default: `GRADIO_SERVER_PORT`, then `PORT`, then `7860`) and optional `--no-browser`, then queues and launches Gradio.
 
 ## `src/app/main.py`
 -   **Purpose:** Defines Gradio Blocks, hooks, handlers, pipeline helpers, and shared constants for predictable per-run/`output_images.zip` layout.

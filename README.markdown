@@ -120,7 +120,7 @@ To run the application locally for development or testing purposes:
     ```
 4.  Open your web browser at the URL printed by Gradio (default base port is **7860**).
 
-Optional: set a port with `--port` or the `GRADIO_SERVER_PORT` environment variable (same meaning as `--port`).
+Optional: set a port with `--port`, or the `GRADIO_SERVER_PORT` or `PORT` environment variables (same meaning as `--port`; `PORT` is common on hosted platforms).
 
 ### Supported upload formats
 

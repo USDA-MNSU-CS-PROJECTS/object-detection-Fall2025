@@ -13,6 +13,17 @@ def launch(*, port: int, inbrowser: bool) -> None:
     ui.app.launch(inbrowser=inbrowser, server_port=port)
 
 
+def _resolve_port(cli_port: int | None) -> int:
+    """CLI wins; then GRADIO_SERVER_PORT; then PORT (common on hosted platforms); default 7860."""
+    if cli_port is not None:
+        return cli_port
+    for key in ("GRADIO_SERVER_PORT", "PORT"):
+        val = os.environ.get(key)
+        if val:
+            return int(val)
+    return 7860
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Alfalfa stem object detection (Gradio UI)")
     parser.add_argument(
@@ -20,7 +31,7 @@ def main() -> None:
         type=int,
         default=None,
         metavar="N",
-        help="Server port (default: GRADIO_SERVER_PORT environment variable or 7860).",
+        help="Server port (default: GRADIO_SERVER_PORT, PORT, or 7860).",
     )
     parser.add_argument(
         "--no-browser",
@@ -28,10 +39,7 @@ def main() -> None:
         help="Do not open a browser window on startup.",
     )
     args = parser.parse_args()
-    if args.port is not None:
-        port = args.port
-    else:
-        port = int(os.environ.get("GRADIO_SERVER_PORT", "7860"))
+    port = _resolve_port(args.port)
     launch(port=port, inbrowser=not args.no_browser)
 
 
