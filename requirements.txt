@@ -1,0 +1,61 @@
+# Alfalfa Stem Object Detection — pip requirements
+#
+# Mirrors `environment.yml` (conda) for users who prefer a plain venv + pip
+# workflow. Targets Python 3.9 (gradio 3.50.2 is the only version that works
+# reliably with the rest of this stack on Python 3.9).
+#
+# Install from the repository root:
+#     python -m venv .venv
+#     # Windows: .venv\Scripts\activate
+#     # macOS/Linux: source .venv/bin/activate
+#     pip install -r requirements.txt
+#
+# Then run the Gradio UI:
+#     cd src/app
+#     python main.py
+
+# --- Deep learning / object detection ---
+ultralytics
+torch
+torchvision
+
+# --- Imaging / CV ---
+opencv-python
+pillow
+matplotlib
+nd2
+nd2reader
+tifffile
+
+# --- Numerics & geometry ---
+numpy>=1.23,<2.0
+scipy
+scikit-image
+scikit-learn
+shapely
+
+# --- Web UI ---
+gradio==3.50.2
+
+# --- Data / IO ---
+pandas
+pyyaml
+
+# --- Box downloader / general utilities (kept for parity with environment.yml) ---
+attrs>=17.3.0
+boxsdk==3.14.0
+certifi>=2024.6.2
+cffi>=1.16.0
+charset-normalizer>=3.3.2
+cryptography>=42.0.0
+idna>=3.7
+PyJWT>=2.8.0
+python-dateutil>=2.8.1
+python-dotenv>=1.0.1
+requests>=2.31.0
+requests-toolbelt>=1.0.0
+six>=1.16.0
+typing-extensions>=4.12.0
+urllib3>=2.2.0
+pycparser>=2.21
+setuptools>=58.0.4

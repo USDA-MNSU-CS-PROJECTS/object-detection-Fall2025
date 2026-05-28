@@ -48,7 +48,8 @@ The repository includes scripts for data downloading, model training, the main G
 │   └── model_inference/        # Standalone inference scripts / docs
 ├── setup_directories.py
 ├── create_portable_package.bat
-├── environment.yml
+├── environment.yml          # Conda environment definition
+├── requirements.txt         # pip install -r requirements.txt (venv workflow)
 └── README.markdown
 ```
 
@@ -70,7 +71,36 @@ cd Dave-bot
 
 ### 3. Environment Setup
 
-This project uses a Conda environment to ensure a consistent development setup.
+You can set up the project with **either** Conda **or** a plain Python virtual environment + `pip`. Pick one — they install the same dependencies.
+
+#### Option A: pip + venv (recommended for Windows clients via the Alfalfa Unified UI)
+
+Requires Python 3.9 on `PATH` (gradio 3.50.2 — pinned in `requirements.txt` — is the only Gradio version that works reliably with the rest of this stack on Python 3.9).
+
+From the repository root:
+
+**Windows (cmd):**
+
+```cmd
+cd C:\Users\<you>\alfalfa-tools\object-detection-Fall2025
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+**macOS / Linux:**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Then launch the UI (see [§4 Running the Gradio Application](#4-running-the-gradio-application)).
+
+#### Option B: Conda
+
+This project also ships a Conda environment file for a consistent development setup.
 
 1.  **Create the Conda Environment:**
     Navigate to the project root directory (where `environment.yml` is located) and run the following command to create the environment:
@@ -109,18 +139,28 @@ The main application is the Gradio web interface.
 
 To run the application locally for development or testing purposes:
 
-1.  **Ensure the environment is active.**
-2.  **Navigate to the application directory:**
+1.  **Ensure the environment is active** (either the venv from Option A or the Conda env from Option B).
+2.  **Navigate to the application directory and start the UI:**
+
+    **Windows (cmd):**
+
+    ```cmd
+    cd src\app
+    python main.py
+    ```
+
+    **macOS / Linux:**
+
     ```bash
     cd src/app
+    python main.py
     ```
-3.  **Run the app:**
-    ```bash
-    python app.py
-    ```
-4.  Open your web browser at the URL printed by Gradio (default base port is **7860**).
 
-Optional: set a port with `--port`, or the `GRADIO_SERVER_PORT` or `PORT` environment variables (same meaning as `--port`; `PORT` is common on hosted platforms).
+    `main.py` is the canonical entry point (it sets up `sys.path` for the bundled `api/` and `third_party/` modules, then launches the same Gradio `app` that `app.py` wraps). `python app.py` also works and accepts `--port` / `--no-browser` flags.
+
+3.  Open your web browser at the URL printed by Gradio. The default port is **7860**; the Alfalfa Unified UI launcher typically pins this tool to **7861** via the `PORT` environment variable.
+
+Optional: set a port with `--port` (when launching via `app.py`), or with the `GRADIO_SERVER_PORT` / `PORT` environment variables (`PORT` is what the Alfalfa Unified UI uses).
 
 ### Supported upload formats
 

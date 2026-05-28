@@ -458,3 +458,12 @@ with gr.Blocks(title="Alfalfa Stem Tool") as app:
         outputs=[convert_files, convert_status, convert_zip]
     )
 
+
+if __name__ == "__main__":
+    # Allow `python main.py` to launch the UI directly (mirrors app.py behavior).
+    # Port resolution: GRADIO_SERVER_PORT, then PORT, then 7860.
+    _port = next(
+        (int(os.environ[k]) for k in ("GRADIO_SERVER_PORT", "PORT") if os.environ.get(k)),
+        7860,
+    )
+    app.queue().launch(server_port=_port, inbrowser=True)
