@@ -79,12 +79,23 @@ Requires Python 3.9 on `PATH` (gradio 3.50.2 — pinned in `requirements.txt` �
 
 From the repository root:
 
+**Windows (PowerShell):**
+
+```powershell
+cd C:\Users\<you>\alfalfa-tools\object-detection-Fall2025
+python -m venv .venv
+.venv\Scripts\activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
 **Windows (cmd):**
 
 ```cmd
 cd C:\Users\<you>\alfalfa-tools\object-detection-Fall2025
 python -m venv .venv
-.venv\Scripts\activate
+.venv\Scripts\activate.bat
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
@@ -93,8 +104,11 @@ pip install -r requirements.txt
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
+
+> The `pip install --upgrade pip` step is important: older pip versions (≤ 24.0) have a weaker dependency resolver and routinely fail on this stack on Windows.
 
 Then launch the UI (see [§4 Running the Gradio Application](#4-running-the-gradio-application)).
 
